@@ -6,13 +6,13 @@
 namespace sbm
 {
 	template<typename T>
-	T abs(T num)
+	inline T abs(T num)
 	{
 		return num >= 0 ? num : -num;
 	}
 
 	template<typename T>
-	T max(T a, T b)
+	inline T max(T a, T b)
 	{
 		return a > b ? a : b;
 	}
@@ -27,7 +27,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	T min(T a, T b)
+	inline T min(T a, T b)
 	{
 		return a < b ? a : b;
 	}
@@ -42,9 +42,16 @@ namespace sbm
 	}
 
 	template<typename T>
-	T clamp(T x, T a, T b)
+	inline T clamp(T x, T a, T b)
 	{
 		return x < a ? a : (x > b ? b: x);
+	}
+
+	template<typename T>
+	inline T clamp01(T x)
+	{
+		auto a = T(0), b = T(1);
+		return x < a ? a : (x > b ? b : x);
 	}
 
 	float sin(float rad);

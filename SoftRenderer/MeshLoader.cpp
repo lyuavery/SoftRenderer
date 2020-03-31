@@ -8,17 +8,12 @@
 #include <fstream>
 
 #include "Header.h"
+#include "Log.h"
 #include "MeshLoader.h"
 #include "Mesh.h"
 
-using namespace SR;
-MeshLoader* MeshLoader::instance = nullptr;
 
-MeshLoader& MeshLoader::Instance() {
-	return *instance;
-}
-
-Mesh* MeshLoader::Load(const std::string& fileName)
+SR::Mesh* SR::MeshLoader::Load(const std::string& fileName)
 {
 	if (fileName.empty())
 		return nullptr;
@@ -40,7 +35,7 @@ Mesh* MeshLoader::Load(const std::string& fileName)
 	}
 }
 
-Mesh* MeshLoader::LoadObj(const std::string& fileName)
+SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName)
 {
 	std::ifstream in;
 	in.open(fileName, std::ifstream::in);

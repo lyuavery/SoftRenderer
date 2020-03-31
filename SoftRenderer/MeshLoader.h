@@ -9,16 +9,20 @@ namespace SR
 	class MeshLoader
 	{
 	public:
-		static MeshLoader& Instance();
+		static MeshLoader& GetInstance()
+		{
+			static MeshLoader* instance = new MeshLoader;
+			return *instance;
+		}
+
 		enum class FileType {
-			Obj
+			OBJ
 		};
 
 		class Mesh* Load(const std::string& fileName);
 
 
 	private:
-		static MeshLoader* instance;
 
 		MeshLoader() {}
 		MeshLoader(const MeshLoader& ml) {}
