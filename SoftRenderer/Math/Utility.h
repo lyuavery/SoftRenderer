@@ -1,6 +1,8 @@
 #pragma once
 #include <initializer_list>
 #include <cmath>
+#include "Vector.h"
+#include "Math.h"
 // TODO：<T>vec<int>泛型创建向量结构体
 // TODO：数学库
 namespace sbm
@@ -54,8 +56,44 @@ namespace sbm
 		return x < a ? a : (x > b ? b : x);
 	}
 
+	template<typename T>
+	sbm::Vec<T,3> reflect(const sbm::Vec<T, 3>& i, const sbm::Vec<T, 3>& n)
+	{
+		//Vec3 iNorm = i.Normalized();
+		//Vec3 nNorm = n.Normalized();
+		return i - 2 * Dot(i, n) * n;
+	}
+	
+	template<typename T>
+	inline T radians(T x)
+	{
+		return x*Math::Degree2Rad;
+	}
+	
+	template<typename T>
+	inline T degrees(T x)
+	{
+		return x * Math::Rad2Degree;
+	}
+
+	template<typename T>
+	sbm::Vec<T, 3> barycentric(const sbm::Vec<T, 2>& v0, const const sbm::Vec<T, 2>& v1, const const sbm::Vec<T, 2>& v2, const const sbm::Vec<T, 2>& p)
+	{
+		// (u, v, 1) 与（AB.x, AC.x, PA.x) 和（AB.y, AC.y, PA.y) 正交，
+		sbm::Vec<T, 3> lambda = Cross(sbm::Vec<T, 3>(v1.x - v0.x, v2.x - v0.x, v0.x - p.x), sbm::Vec<T, 3>(v1.y - v0.y, v2.y - v0.y, v0.y - p.y));
+		// 由于使用整数坐标，lambda.z为两倍三角形面积，等于0时证明退化
+		if (sbm::abs(lambda.z) < 1e-4) return sbm::Vec<T, 3>(-1, 1, 1);
+		float rcpArea = 1.0f / lambda.z;
+		// 除以lambda.z来规范重心坐标和为1
+		return sbm::Vec<T, 3>(1.f - (lambda.x + lambda.y) * rcpArea, lambda.x * rcpArea, lambda.y * rcpArea);
+	}
+
 	float sin(float rad);
 	float cos(float rad);
+	float tan(float rad);
+	float cot(float rad);
 	float pow(float left, float right);
-
+	float asin(float x);
+	float acos(float x);
+	
 }

@@ -15,7 +15,7 @@ namespace sbm
 	template<size_t NR, size_t NC, typename T = float>
 	struct Matrix
 	{
-	private:
+	protected:
 		T value[NR*NC];// column major
 	public:
 		Matrix() = default;

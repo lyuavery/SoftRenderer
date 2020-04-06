@@ -8,6 +8,9 @@
 #include <type_traits>
 #include <algorithm>
 #include <vector>
+#include <ostream>
+
+// 可以考虑写一个自定义类型T, 各元素视为符号，输出符号表示的运算结果
 namespace sbm
 {
 #define MAT(m, r, c) (m).value[(r) + (c) * 4]
@@ -15,7 +18,7 @@ namespace sbm
 	template<typename T>
 	struct Matrix<4, 4, T>
 	{
-	private:
+	protected:
 		T value[16];// column major
 	public:
 		Matrix() = default;
@@ -48,19 +51,29 @@ namespace sbm
 
 		void SetIdentity();
 		Matrix GetInversed();
-		static bool InverseMatrix(const Matrix<4, 4, T>& in, Matrix<4, 4, T>& out);
 		Matrix GetTransposed();
 
-		sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4);
-		template<typename T> friend sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4, const Matrix<4, 4, T>& m4);
-		template<typename T, size_t NX> friend Matrix<NX, 4, T> operator*(const Matrix<NX, 4, T>& lhs, const Matrix<4, 4, T>& rhs);
 		Matrix operator*(const Matrix& m4);
-		template<size_t NX> Matrix<4, NX, T> operator*(const Matrix<4, NX, T> m4);
 		Matrix& operator*=(const Matrix& m4);
+		sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4);
+		template<size_t NX> Matrix<4, NX, T> operator*(const Matrix<4, NX, T>& m4);
+		template<typename T> friend std::ostream& operator<<(std::ostream& out, const Matrix<4, 4, T>& m4);
+		template<typename T> friend sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4, const Matrix<4, 4, T>& m4);
 
-		static const Matrix<4, 4, T> Identity;
 		inline const size_t RowSize() const { return 4; }
 		inline const size_t ColSize() const { return 4; }
+
+		operator Matrix<3, 3, T>();
+
+		static const Matrix<4, 4, T> Identity;
+		static bool InverseMatrix(const Matrix<4, 4, T>& in, Matrix<4, 4, T>& out);
+		static Matrix<4, 4, T> TRS(const Vec<T, 3>& translation, const Vec<T, 3>& rotation, const Vec<T, 3>& scale);
+		static Matrix<4, 4, T> Translate(const Vec<T, 3>& translation);
+		static Matrix<4, 4, T> Rotate(const Vec<T, 3>& rotation);
+		static Matrix<4, 4, T> Scale(const Vec<T, 3>& scale);
+		static Matrix<4, 4, T> LookAt(const Vec<T, 3>& eye, const Vec<T, 3>& position, const Vec<T, 3>& up);
+		/*static Matrix<4, 4, T> Frustum(T left, T right, T bottom, T top, T nearClip, T farClip);
+		static Matrix<4, 4, T> Ortho(const Vec3& eye, T nearClip, T farClip);*/
 	};
 
 	template<typename T>
@@ -144,7 +157,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	Matrix<4, 4, T>& Matrix<4, 4, T>::operator*=(const Matrix& m4)
+	Matrix<4, 4, T>& Matrix<4, 4, T>::operator*=(const Matrix<4, 4, T>& m4)
 	{
 		assert(&m4 != this);
 		Matrix<4, 4, T> temp;
@@ -292,10 +305,82 @@ namespace sbm
 		{
 			for (int j = i + 1; j < 4; ++j)
 			{
-				std::swap(temp.M(i, j), temp.M(j, i));
+				std::swap(MAT(temp, i, j), MAT(temp, j, i));
 			}
 		}
 		return temp;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::TRS(const Vec<T, 3>& translation, const Vec<T, 3>& rotation, const Vec<T, 3>& scale)
+	{
+		float radx = sbm::radians(rotation.x), rady = sbm::radians(rotation.y), radz = sbm::radians(rotation.z);
+		float cosx = sbm::cos(radx), sinx = sbm::sin(radx), cosy = sbm::cos(rady), siny = sbm::sin(rady), cosz = sbm::cos(radz), sinz = sbm::sin(radz);
+		/*
+		auto rotx = Matrix<4, 4, T>::Identity, roty = Matrix<4, 4, T>::Identity, rotz = Matrix<4, 4, T>::Identity;
+		MAT(rotx, 1, 1) = cosx; MAT(rotx, 1, 2) = -sinx; MAT(rotx, 2, 1) = sinx; MAT(rotx, 2, 2) = cosx;
+		MAT(roty, 0, 0) = cosy; MAT(roty, 0, 2) = siny; MAT(roty, 2, 0) = -siny; MAT(roty, 2, 2) = cosy;
+		MAT(rotz, 0, 0) = cosz; MAT(rotz, 0, 1) = -sinz; MAT(rotz, 1, 0) = sinz; MAT(rotz, 1, 1) = cosz;
+		auto trs = roty * rotx * rotz;
+		*/
+
+		// unroll版
+		// Y * X * Z * vec，顺规ZXY
+		auto trs = Matrix<4, 4, T>::Identity; 
+		MAT(trs, 0, 0) = cosz * cosy + sinx * siny * sinz; MAT(trs, 0, 1) = -sinz * cosy + sinx * siny * cosz; MAT(trs, 0, 2) = cosx * siny;
+		MAT(trs, 1, 0) = cosx * sinz; MAT(trs, 1, 1) = cosx * cosz; MAT(trs, 1, 2) = -sinx;
+		MAT(trs, 2, 0) = -cosz * siny + sinx * cosy * sinz; MAT(trs, 2, 1) = sinz * siny + sinx * cosy * cosz; MAT(trs, 2, 2) = cosx * cosy;
+		MAT(trs, 0, 0) *= scale.x; MAT(trs, 1, 0) *= scale.x; MAT(trs, 2, 0) *= scale.x;
+		MAT(trs, 0, 1) *= scale.y; MAT(trs, 1, 1) *= scale.y; MAT(trs, 2, 1) *= scale.y;
+		MAT(trs, 0, 2) *= scale.z; MAT(trs, 1, 2) *= scale.z; MAT(trs, 2, 2) *= scale.z;
+		MAT(trs, 0, 3) = translation.x; MAT(trs, 1, 3) = translation.y; MAT(trs, 2, 3) = translation.z;
+		return trs;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::Translate(const Vec<T, 3>& translation)
+	{
+		Matrix<4, 4, T> mat = Matrix<4, 4, T>::Identity;
+		MAT(mat, 0, 3) = translation.x;
+		MAT(mat, 1, 3) = translation.y;
+		MAT(mat, 2, 3) = translation.z;
+		return mat;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::Rotate(const Vec<T, 3>& rotation)
+	{
+		float radx = sbm::radians(rotation.x), rady = sbm::radians(rotation.y), radz = sbm::radians(rotation.z);
+		float cosx = sbm::cos(radx), sinx = sbm::sin(radx), cosy = sbm::cos(rady), siny = sbm::sin(rady), cosz = sbm::cos(radz), sinz = sbm::sin(radz);
+		auto mat = Matrix<4, 4, T>::Identity;
+		MAT(mat, 0, 0) = cosz * cosy + sinx * siny * sinz; MAT(mat, 0, 1) = -sinz * cosy + sinx * siny * cosz; MAT(mat, 0, 2) = cosx * siny;
+		MAT(mat, 1, 0) = cosx * sinz; MAT(mat, 1, 1) = cosx * cosz; MAT(mat, 1, 2) = -sinx;
+		MAT(mat, 2, 0) = -cosz * siny + sinx * cosy * sinz; MAT(mat, 2, 1) = sinz * siny + sinx * cosy * cosz; MAT(mat, 2, 2) = cosx * cosy;
+		return mat;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::Scale(const Vec<T, 3>& scale)
+	{
+		auto mat = Matrix<4, 4, T>::Identity;
+		MAT(mat, 0, 0) = scale.x;
+		MAT(mat, 1, 1) = scale.y;
+		MAT(mat, 2, 2) = scale.z;
+		return mat;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::LookAt(const Vec<T, 3>& eye, const Vec<T, 3>& center, const Vec<T, 3>& up)
+	{
+		auto view = Matrix<4, 4, T>::Identity;
+		auto front = (center - eye).Normalized();
+		auto right = Cross(front, up).Normalized();
+		auto upNorm = Cross(right, front).Normalized();
+		view.SetRow(0, right.x, right.y, right.z, -Dot(right, eye));
+		view.SetRow(1, upNorm.x, upNorm.y, upNorm.z, -Dot(upNorm, eye));
+		view.SetRow(2, -front.x, -front.y, -front.z, Dot(front, eye)); // 右手系的相机空间也是右手系的
+		view.SetRow(3, 0, 0, 0, 1.f);
+		return view;
 	}
 
 	template<typename T>
@@ -309,24 +394,31 @@ namespace sbm
 			);
 	}
 
-	template<typename T, size_t NX>
-	Matrix<NX, 4, T> operator*(const Matrix<NX, 4, T>& lhs, const Matrix<4, 4, T>& rhs)
+	template<typename T>
+	template<size_t NX>
+	Matrix<4, NX, T> Matrix<4, 4, T>::operator*(const Matrix<4, NX, T>& m4x)
 	{
-		Matrix<NX, 4, T> temp;
-		for (int c = 0; c < 4; ++c)
+		Matrix<4, NX, T> temp;
+		for (int x = 0; x < NX; ++x)
 		{
-			for (int x = 0; x < NX; ++x)
-			{
-				T sum = T(0);
-				for (int r = 0; r < 4; ++r)
-				{
-					sum += lhs.M(x, r) * rhs.M(r, c);
-				}
-				temp.M(x, c) = sum;
-			}
+			temp[4 * x] = _M(0, 0) * MAT(m4x, 0, x) + _M(0, 1) * MAT(m4x, 1, x) + _M(0, 2) * MAT(m4x, 2, x) + _M(0, 3) * MAT(m4x, 3, x);
+			temp[4 * x + 1] = _M(1, 0) * MAT(m4x, 0, x) + _M(1, 1) * MAT(m4x, 1, x) + _M(1, 2) * MAT(m4x, 2, x) + _M(1, 3) * MAT(m4x, 3, x);
+			temp[4 * x + 2] = _M(2, 0) * MAT(m4x, 0, x) + _M(2, 1) * MAT(m4x, 1, x) + _M(2, 2) * MAT(m4x, 2, x) + _M(2, 3) * MAT(m4x, 3, x);
+			temp[4 * x + 3] = _M(3, 0) * MAT(m4x, 0, x) + _M(3, 1) * MAT(m4x, 1, x) + _M(3, 2) * MAT(m4x, 2, x) + _M(3, 3) * MAT(m4x, 3, x);
 		}
 		return temp;
 	}
+
+	template<typename T>
+	std::ostream& operator<<(std::ostream& out, const Matrix<4, 4, T>& m4)
+	{
+		out << MAT(m4, 0, 0) << " " << MAT(m4, 0, 1) << " " << MAT(m4, 0, 2) << " " << MAT(m4, 0, 3) << "\n"
+			<< MAT(m4, 1, 0) << " " << MAT(m4, 1, 1) << " " << MAT(m4, 1, 2) << " " << MAT(m4, 1, 3) << "\n"
+			<< MAT(m4, 2, 0) << " " << MAT(m4, 2, 1) << " " << MAT(m4, 2, 2) << " " << MAT(m4, 2, 3) << "\n"
+			<< MAT(m4, 3, 0) << " " << MAT(m4, 3, 1) << " " << MAT(m4, 3, 2) << " " << MAT(m4, 3, 3) << "\n";
+		return out;
+	}
+
 #undef MAT
 #undef _M
 
@@ -349,4 +441,4 @@ namespace sbm
 	const Matrix<4, 4, T> Matrix<4, 4, T>::Identity = CreateIdentityMatrix<T>();
 }
 
-typedef sbm::Matrix<4,4,float> Mat4;
+typedef sbm::Matrix<4, 4, float> Mat4;

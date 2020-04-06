@@ -1,22 +1,24 @@
 #pragma once
-#include <Windows.h>
-
+#include "Sealed.h"
+#include "Header.h"
 namespace SR
 {
-	class Time
+	class Time : virtual private ISealed<Time>
 	{
+		static float deltaTime;
+		static float lastUpdateTime;
+		static double clockPeriod;
+		static UInt32 frameCnt;
 	public:
-		static float Now()
+		static inline UInt32 FrameCnt() { return frameCnt; }
+		static inline float DeltaTime() { return deltaTime; }
+		static inline float TimeSinceSinceStartup()
 		{
-			static double period = -1;
 			LARGE_INTEGER counter;
-			if (period < 0) {
-				LARGE_INTEGER frequency;
-				QueryPerformanceFrequency(&frequency);
-				period = 1 / (double)frequency.QuadPart;
-			}
 			QueryPerformanceCounter(&counter);
-			return float(counter.QuadPart * period);
+			return float(counter.QuadPart * clockPeriod);
 		}
+		static void Init();
+		static void Update();
 	};
 }

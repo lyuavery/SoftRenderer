@@ -16,8 +16,10 @@
 #include "Color.h"
 #include "Texture.h"
 #include "FrameBuffer.h"
-#include "Window.h"
 #include "Log.h"
+#include "Camera.h"
+#include "Window.h"
+
 
 static int screen_keys[512];	// 当前键盘按下状态
 //#ifdef _MSC_VER
@@ -115,52 +117,6 @@ namespace SR
 		}
 	};
 
-	enum class KeyCode
-	{
-		None = 0,
-		Return,
-		Escape,
-		Space,
-		A,
-		D,
-		E,
-		Q,
-		S,
-		W,
-		UpArrow,
-		DownArrow,
-		RightArrow,
-		LeftArrow,
-		F1,
-		F2,
-		F3,
-		F4,
-		F5,
-		F6,
-		F7,
-		F8,
-		F9,
-		F10,
-		F11,
-		F12,
-		LeftCtrl,
-		RightCtrl,
-		LeftMouse,
-		MiddleMouse,
-		RightMouse,
-	};
-
-	class InputMgr
-	{
-		friend class WindowMgr;
-	private:
-		bool keyDown[512];
-		bool keyUp[512];
-		bool isDirty;
-	public:
-
-	};
-
 	/*class RenderTarget
 	{
 	public:
@@ -176,23 +132,7 @@ static int gWidth = 800;
 static int gHeight = 600;
 
 
-Vec3 Reflect(const Vec3& i, const Vec3& n)
-{
-	//Vec3 iNorm = i.Normalized();
-	//Vec3 nNorm = n.Normalized();
-	return i - 2 * Dot(i, n) * n;
-}
 
-Vec3 BarycentricF_Projection(const Vec4& v0, const Vec4& v1, const Vec4& v2, const Vec2& p)
-{
-	// (u, v, 1) 与（AB.x, AC.x, PA.x) 和（AB.y, AC.y, PA.y) 正交，
-	Vec3 lambda = Cross(Vec3(v1.x - v0.x, v2.x - v0.x, v0.x - p.x), Vec3(v1.y - v0.y, v2.y - v0.y, v0.y - p.y));
-	// 由于使用整数坐标，lambda.z为两倍三角形面积，等于0时证明退化
-	if (sbm::abs(lambda.z) < 1e-4) return Vec3(-1, 1, 1);
-	float rcpArea = 1.0f / lambda.z;
-	// 除以lambda.z来规范重心坐标和为1
-	return Vec3(1.f - (lambda.x + lambda.y) * rcpArea, lambda.x * rcpArea, lambda.y * rcpArea);
-}
 
 Mat4 GetViewportMatrix(int x, int y, int width, int height)
 {
@@ -219,28 +159,195 @@ Mat4 GetLookAtMatrix(const Vec3& eye, const Vec3& center, const Vec3& up)
 	return view;
 }
 
-Mat4 GetTRSMatrix(const Vec3& translation, const Vec3& rotation, const Vec3& scale)
+//
+//class MathSymbol {
+//	std::string str;
+//public:
+//	MathSymbol() { str = ""; }
+//	MathSymbol(const MathSymbol& v) { str = v.str; }
+//	MathSymbol(const char* v) :str(v) { }
+//	MathSymbol(const std::string& v) :str(v) { }
+//	MathSymbol(const float v):str("("+std::to_string(v)+")") { }
+//	MathSymbol operator+(const MathSymbol& symbol) {
+//		if (symbol.str == "0" && str == "0")  return MathSymbol("0");
+//		if (symbol.str == "0") return *this;
+//		if (str == "0") return symbol;
+//		return MathSymbol(str+ "+" + symbol.str);
+//	}
+//	MathSymbol operator*(const MathSymbol& symbol) {
+//		if (symbol.str == "0" || str == "0") return MathSymbol("0");
+//		if (symbol.str == "1" && str == "1")  return MathSymbol("1");
+//		if (symbol.str == "1") return *this;
+//		if (str == "1") return symbol;
+//		return MathSymbol(str + "*" + symbol.str);
+//	}
+//	MathSymbol& operator=(const MathSymbol& symbol) {
+//		str = symbol.str;
+//		return *this;
+//	}
+//	friend std::ostream& operator<<(std::ostream& out, const MathSymbol& ms);
+//};
+//std::ostream& operator<<(std::ostream& out, const MathSymbol& ms)
+//{
+//	out << ms.str;
+//	return out;
+//}
+//MathSymbol rxarr[] = {
+//		"1","0","0","0",
+//		"0","cosx","-sinx","0",
+//		"0","sinx","cosx","0",
+//		"0","0","0","1",
+//};
+//TestMat rx(rxarr);
+//
+//MathSymbol ryarr[] = {
+//	"cosy","0","siny","0",
+//	"0","1","0","0",
+//	"-siny","0","cosy","0",
+//	"0","0","0","1",
+//};
+//TestMat ry(ryarr);
+//
+//MathSymbol rzarr[] = {
+//	"cosz","-sinz","0","0",
+//	"sinz","cosz","0","0",
+//	"0","0","1","0",
+//	"0","0","0","1",
+//};
+//TestMat rz(rzarr);
+////TestMat ret = ry * rx * rz;
+//TestMat ret = rz * ry * rx;
+//std::cout << ret;
+//getchar();
+//return 0;
+//typedef sbm::Matrix<4, 4, MathSymbol> TestMat;
+
+void TestDraw(SR::Texture& image, SR::Texture& zBuf,
+	Vec3 v0, Vec3 v1, Vec3 v2,
+	Vec2 uv0, Vec2 uv1, Vec2 uv2,
+	Vec3 n0, Vec3 n1, Vec3 n2,
+	SR::Color color
+);
+
+void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(SR::Texture& image, SR::Texture& tex, SR::Texture& normalMap, SR::Texture& specMap, SR::Texture& zBuf,
+	Vec3 v0, Vec3 v1, Vec3 v2,
+	Vec2 uv0, Vec2 uv1, Vec2 uv2,
+	Vec3 n0, Vec3 n1, Vec3 n2
+);
+
+Mat4 gViewportMat;
+Mat4 gViewMat;
+Mat4 gProjMat;
+Vec3 gCameraPos;
+int main()
 {
-	const float d2r = sbm::Math::PI / 180.f;
-	float radx = rotation.x * d2r, rady = rotation.y * d2r, radz = rotation.z * d2r;
-	float cosx = sbm::cos(radx), sinx = sbm::sin(radx), cosy = sbm::cos(rady), siny = sbm::sin(rady), cosz = sbm::cos(radz), sinz = sbm::sin(radz);
-	Mat4 rotx = Mat4::Identity, roty = Mat4::Identity, rotz = Mat4::Identity;
-	rotx.M(1, 1) = cosx; rotx.M(1, 2) = -sinx; rotx.M(2, 1) = sinx; rotx.M(2, 2) = cosx;
-	roty.M(0, 0) = cosy; roty.M(0, 2) = siny; roty.M(2, 0) = -siny; roty.M(2, 2) = cosy;
-	rotz.M(0, 0) = cosz; rotz.M(0, 1) = -sinz; rotz.M(1, 0) = sinz; rotz.M(1, 1) = cosz;
-	Mat4 trs = roty * rotx * rotz;
-	trs.M(0, 0) *= scale.x; trs.M(1, 0) *= scale.x; trs.M(2, 0) *= scale.x;
-	trs.M(0, 1) *= scale.y; trs.M(1, 1) *= scale.y; trs.M(2, 1) *= scale.y;
-	trs.M(0, 2) *= scale.z; trs.M(1, 2) *= scale.z; trs.M(2, 2) *= scale.z;
-	trs.M(0, 3) = translation.x; trs.M(1, 3) = translation.y; trs.M(2, 3) = translation.z;
-	return trs;
+	SR::Camera::mainCamera = std::unique_ptr<SR::Camera>(new SR::Camera(Vec3(0,0,3), Vec3(0)));
+	auto& mainCam = *SR::Camera::mainCamera;
+	mainCam.viewport = SR::Viewport(0, 0, gWidth, gHeight, true);
+
+	mainCam.RegisterInputListener();
+	
+	gViewportMat = mainCam.ViewportTransform();
+	gCameraPos = mainCam.position;
+
+	int w = gWidth, h = gHeight;
+
+	auto& wnd = SR::Window::GetInstance();
+	wnd.Init(w, h, true);
+	auto backBuf = wnd.GetBackBuffer();
+	if (backBuf)
+	{
+		backBuf->Clear(SR::Color32::grey);
+	}
+	//SR::RenderTarget::active = backBuf;
+	//memset(screen_keys, 0, sizeof(int) * 512);
+	/*foreach pluginMgr.plugins.Init();
+	while (!window->IsExit()) {
+		inputsystem->Update();
+		render
+	}*/
+
+	//std::unique_ptr<SR::Mesh> floor(SR::MeshLoader::GetInstance().Load("Resources/floor/floor.obj"));
+	float fltMax = sbm::Math::FloatMax;
+	std::unique_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
+	SR::TGALoader tgaLoader;
+	std::unique_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	std::unique_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	std::unique_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+
+	/*for (int j = 0, w = backBuf->colorBuf.GetWidth(), h = backBuf->colorBuf.GetHeight(); j < h; ++j)
+	{
+		for (int i = 0; i < w; ++i)
+		{
+			backBuf->colorBuf.Set(i, j, africanHeadSpec->Get(i, j));
+		}
+	}
+*/
+	SR::Time::Init();
+	float prevTimeMark = SR::Time::TimeSinceSinceStartup();
+	float elapseTime = 0;
+	float elapseFrameCnt = 0;
+	while (!wnd.ShouldExit()) {
+		SR::Time::Update();		
+		float now = SR::Time::TimeSinceSinceStartup();
+		float deltaTime = SR::Time::DeltaTime();
+		elapseTime += deltaTime;
+		++elapseFrameCnt;
+
+		SR::Input::Update(deltaTime);
+		gViewMat = mainCam.ViewMatrix();
+		gProjMat = mainCam.ProjectionMatrix();
+
+		if (SR::Input::GetKeyDown(SR::KeyCode::Z))
+		{
+			mainCam.Orbit(45, 45);
+		}
+
+		backBuf->Clear(SR::Color32::grey);
+		TestDraw(backBuf->colorBuf, backBuf->depthBuf,
+			//Vec3(-.5f, -.5f, .5f), Vec3(.5f, -.5f, -.5f), Vec3(0, .5f, 0),
+			//Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
+			//Vec3(1, 0, 1), Vec3(1, 0, 1), Vec3(1, 0, 1),
+			Vec3(-.5f, -.5f, .0f), Vec3(.5f, -.5f, .0f), Vec3(-.5f, .5f, 0),
+			Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
+			Vec3(0, 0, 1), Vec3(0, 0, 1), Vec3(0, 0, 1),
+			SR::Color::white
+			);
+		/*for (auto f : africanHead->faces) {
+			auto v0 = africanHead->vertices[f[0][0]];
+			auto v1 = africanHead->vertices[f[1][0]];
+			auto v2 = africanHead->vertices[f[2][0]];
+
+			auto uv0 = africanHead->uv[f[0][1]];
+			auto uv1 = africanHead->uv[f[1][1]];
+			auto uv2 = africanHead->uv[f[2][1]];
+
+			auto n0 = africanHead->normals[f[0][2]];
+			auto n1 = africanHead->normals[f[1][2]];
+			auto n2 = africanHead->normals[f[2][2]];
+			
+			DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(backBuf->colorBuf, *africanHeadDiffuse, *africanHeadNormal, *africanHeadSpec, backBuf->depthBuf, v0, v1, v2, uv0, uv1, uv2, n0, n1, n2);
+		}*/
+		wnd.Update(deltaTime);
+		if ((now - prevTimeMark) > 1)
+		{
+			std::cout << "FPS:" << (elapseFrameCnt / elapseTime) << std::endl;
+			prevTimeMark = now;
+			elapseTime = 0;
+			elapseFrameCnt = 0;
+		}
+		wnd.Dispatch();
+	}
+	wnd.Destroy();
+
+	return 0;
 }
 
 void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(SR::Texture& image, SR::Texture& tex, SR::Texture& normalMap, SR::Texture& specMap, SR::Texture& zBuf,
 	Vec3 v0, Vec3 v1, Vec3 v2,
 	Vec2 uv0, Vec2 uv1, Vec2 uv2,
 	Vec3 n0, Vec3 n1, Vec3 n2
-	)
+)
 {
 	// 光照
 	int screenW = gWidth, screenH = gHeight;
@@ -257,12 +364,16 @@ void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(
 	float fltMax = sbm::Math::FloatMax;
 	Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(width, height);
 
-	static Mat4 viewport = GetViewportMatrix(0, 0, screenW, screenH);
 	static Vec3 camera(1, 1, 3), center(0, 0, 0), up(0, 1, 0), trans(0, 0, 0), rot(0, 0, 0), scale(1, 1, 1);
-	Mat4 proj = Mat4::Identity;
+	/*Mat4 proj = Mat4::Identity;
 	proj.M(3, 2) = 1 / camera.z;
-	Mat4 trs = GetTRSMatrix(trans, rot, scale);
 	Mat4 view = GetLookAtMatrix(camera, center, up);
+	static Mat4 viewport = GetViewportMatrix(0, 0, screenW, screenH);
+*/
+	Mat4 trs = Mat4::TRS(trans, rot, scale);
+	Mat4 view = gViewMat;
+	Mat4 proj = gProjMat;
+	Mat4 viewport = gViewportMat;
 	Mat4 MVP = proj * view * trs;// proj ;
 
 	Vec4 screenV0(v0.x, v0.y, v0.z, 1);
@@ -325,7 +436,7 @@ void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(
 		for (int j = bboxMin.x; j <= bboxMax.x; ++j)
 		{
 			Vec2 p(j, i);
-			Vec3 lambda3 = BarycentricF_Projection(screenV0, screenV1, screenV2, p);
+			Vec3 lambda3 = barycentric(screenV0.Truncated<2>(), screenV1.Truncated<2>(), screenV2.Truncated<2>(), p);
 			if (lambda3[0] < .0f || lambda3[1] < .0f || lambda3[2] < .0f) {
 				continue;
 			}
@@ -369,7 +480,7 @@ void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(
 			norm = (tan2World * norm).Normalized();
 			float diffuse = Dot(Vec3(norm), -lightDir);// *0.5f + 0.5f;
 
-			Vec3 e = Reflect(lightDir, Vec3(norm)).Normalized();
+			Vec3 e = reflect(lightDir, Vec3(norm)).Normalized();
 			Vec3 viewDir = (camera - pos).Normalized();
 			float spec = 0.6f * sbm::pow(sbm::max(Dot(viewDir, e), 0.f), sbm::max<decltype(glosscolor.b)>(5, glosscolor.b));
 			//assert(glosscolor.b >= 0);
@@ -403,12 +514,16 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 	float fltMax = sbm::Math::FloatMax;
 	Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(width, height);
 
-	static Mat4 viewport = GetViewportMatrix(0, 0, screenW, screenH);
-	static Vec3 camera(1, 1, 3), center(0, 0, 0), up(0, 1, 0), trans(0, 0, 0), rot(0, 0, 0), scale(1, 1, 1);
+	static Vec3 center(0, 0, 0), up(0, 1, 0), trans(0, 0, 0), rot(0,0,0), scale(1, 1, 1);
+	/*
+	Vec3 camera(0, 0, 3),
 	Mat4 proj = Mat4::Identity;
-	proj.M(3, 2) = 1 / camera.z;
-	Mat4 trs = GetTRSMatrix(trans, rot, scale);
-	Mat4 view = GetLookAtMatrix(camera, center, up);
+	proj.M(3, 2) = 1 / camera.z;*/
+	//Mat4 viewport = GetViewportMatrix(0, 0, screenW, screenH);
+	Mat4 trs = Mat4::TRS(trans, rot, scale);
+	Mat4 view = gViewMat;
+	Mat4 proj = gProjMat;
+	Mat4 viewport = gViewportMat;
 	Mat4 MVP = proj * view * trs;// proj ;
 
 	Vec4 screenV0(v0.x, v0.y, v0.z, 1);
@@ -416,19 +531,24 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 	Vec4 screenV2(v2.x, v2.y, v2.z, 1);
 	Vec4 worldPos0(screenV0), worldPos1(screenV1), worldPos2(screenV2);
 
-	worldPos0 = trs * worldPos0;
-	worldPos1 = trs * worldPos1;
-	worldPos2 = trs * worldPos2;
-
-	screenV0 = MVP * screenV0;
+	screenV0 = trs * screenV0;
+	worldPos0 = screenV0;
+	screenV0 = view * screenV0;
+	screenV0 = proj * screenV0;
 	float screenw0 = screenV0.w;
 	screenV0 = viewport * (screenV0 / screenV0.w);
 
-	screenV1 = MVP * screenV1;
+	screenV1 = trs * screenV1;
+	worldPos1 = screenV1;
+	screenV1 = view * screenV1;
+	screenV1 = proj * screenV1;
 	float screenw1 = screenV1.w;
 	screenV1 = viewport * (screenV1 / screenV1.w);
 
-	screenV2 = MVP * screenV2;
+	screenV2 = trs * screenV2;
+	worldPos2 = screenV2;
+	screenV2 = view * screenV2;
+	screenV2 = proj * screenV2;
 	float screenw2 = screenV2.w;
 	screenV2 = viewport * (screenV2 / screenV2.w);
 
@@ -471,7 +591,7 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 		for (int j = bboxMin.x; j <= bboxMax.x; ++j)
 		{
 			Vec2 p(j, i);
-			Vec3 lambda3 = BarycentricF_Projection(screenV0, screenV1, screenV2, p);
+			Vec3 lambda3 = barycentric(screenV0.Truncated<2>(), screenV1.Truncated<2>(), screenV2.Truncated<2>(), p);
 			if (lambda3[0] < .0f || lambda3[1] < .0f || lambda3[2] < .0f) {
 				continue;
 			}
@@ -482,8 +602,8 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 			float screenz = 1 / screenw;// (screenz0 * lambda3[0] + screenz1 * lambda3[1] + screenz2 * lambda3[2]);
 			//float screenz =  (screenV0.z * lambda3[0] + screenV1.z * lambda3[1] + screenV2.z * lambda3[2]);
 
-			//if (screenz >= zBuf.Get(j, i).r) continue;
-			//zBuf.SetColor(j, i, SR::Color(screenz));
+			/*if (screenz >= zBuf.GetColor(j, i).r) continue;
+			zBuf.SetColor(j, i, SR::Color(screenz));*/
 			// 插值
 			float uvx = (uv0.x * lambda3[0] + uv1.x * lambda3[1] + uv2.x * lambda3[2]);
 			float uvy = (1 - (uv0.y * lambda3[0] + uv1.y * lambda3[1] + uv2.y * lambda3[2]));
@@ -501,7 +621,7 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 			float worldBitangentZ = (worldBitangent0.z * lambda3[0] + worldBitangent1.z * lambda3[1] + worldBitangent2.z * lambda3[2]);
 
 			// 采样
-			
+
 			Vec3 pos(posx, posy, posz); // 引入法线变换后nz就不用反了
 			Vec4 norm = n0.Expanded<4>(0);// Vec4((ncolor.r / 255.f) * 2 - 1, (ncolor.g / 255.f) * 2 - 1, (ncolor.b / 255.f) * 2 - 1, 0);
 			Mat4 tan2World;
@@ -512,8 +632,8 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 			norm = (tan2World * norm).Normalized();
 			float diffuse = Dot(Vec3(norm), -lightDir);// *0.5f + 0.5f;
 
-			Vec3 e = Reflect(lightDir, Vec3(norm)).Normalized();
-			Vec3 viewDir = (camera - pos).Normalized();
+			Vec3 e = reflect(lightDir, Vec3(norm)).Normalized();
+			Vec3 viewDir = (gCameraPos - pos).Normalized();
 			float spec = 0;// 0.6f * sbm::pow(sbm::max(Dot(viewDir, e), 0.f), sbm::max<decltype(glosscolor.b)>(5, glosscolor.b));
 			//assert(glosscolor.b >= 0);
 			auto c = SR::Color32(
@@ -528,168 +648,4 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 			image.SetColor32(j, i, c);
 		}
 	}
-}
-
-
-int main()
-{
-	int w = gWidth, h = gHeight;
-	auto& wnd = SR::Window::GetInstance();
-	wnd.Init(w, h);
-	auto backBuf = wnd.GetBackBuffer();
-	if (backBuf)
-	{
-		backBuf->Clear(SR::Color32::grey);
-	}
-	//SR::RenderTarget::active = backBuf;
-	//memset(screen_keys, 0, sizeof(int) * 512);
-	/*foreach pluginMgr.plugins.Init();
-	while (!window->IsExit()) {
-		inputsystem->Update();
-		render
-	}*/
-
-	//std::unique_ptr<SR::Mesh> floor(SR::MeshLoader::GetInstance().Load("Resources/floor/floor.obj"));
-	float fltMax = sbm::Math::FloatMax;
-	std::unique_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
-	SR::TGALoader tgaLoader;
-	std::unique_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	std::unique_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	std::unique_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
-
-	/*for (int j = 0, w = backBuf->colorBuf.GetWidth(), h = backBuf->colorBuf.GetHeight(); j < h; ++j)
-	{
-		for (int i = 0; i < w; ++i)
-		{
-			backBuf->colorBuf.Set(i, j, africanHeadSpec->Get(i, j));
-		}
-	}
-*/
-	float prevTimeMark = SR::Time::Now();
-	float prevTime = prevTimeMark;
-	float elapseTime = 0;
-	float elapseFrameCnt = 0;
-	float frameCnt = 0;
-	while (!wnd.ShouldExit()) {
-		float now = SR::Time::Now();
-		float deltaTime = now - prevTime;
-		prevTime = now;
-		elapseTime += deltaTime;
-		++elapseFrameCnt;
-		++frameCnt;
-
-		TestDraw(backBuf->colorBuf, backBuf->depthBuf,
-			Vec3(-.5f, -.5f, .5f), Vec3(.5f, -.5f, -.5f), Vec3(0, .5f, 0),
-			Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
-			Vec3(1, 0, 1), Vec3(1, 0, 1), Vec3(1, 0, 1),
-			SR::Color::white
-			);
-		/*for (auto f : africanHead->faces) {
-			auto v0 = africanHead->vertices[f[0][0]];
-			auto v1 = africanHead->vertices[f[1][0]];
-			auto v2 = africanHead->vertices[f[2][0]];
-
-			auto uv0 = africanHead->uv[f[0][1]];
-			auto uv1 = africanHead->uv[f[1][1]];
-			auto uv2 = africanHead->uv[f[2][1]];
-
-			auto n0 = africanHead->normals[f[0][2]];
-			auto n1 = africanHead->normals[f[1][2]];
-			auto n2 = africanHead->normals[f[2][2]];
-			
-			DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(backBuf->colorBuf, *africanHeadDiffuse, *africanHeadNormal, *africanHeadSpec, backBuf->depthBuf, v0, v1, v2, uv0, uv1, uv2, n0, n1, n2);
-		}*/
-		wnd.Update(deltaTime);
-		if ((now - prevTimeMark) > 1)
-		{
-			std::cout << "FPS:" << (elapseFrameCnt / elapseTime) << std::endl;
-			prevTimeMark = now;
-			elapseTime = 0;
-			elapseFrameCnt = 0;
-		}
-		wnd.Dispatch();
-		Sleep(1);
-	}
-	wnd.Destroy();
-
-
-	//TGAImage texture, normalMap, specMap;
-	//texture.read_tga_file("res/diablo3_pose/diablo3_pose_diffuse.tga"); // 
-	//normalMap.read_tga_file("res/diablo3_pose/diablo3_pose_nm_tangent.tga"); // 
-	//specMap.read_tga_file("res/diablo3_pose/diablo3_pose_spec.tga");
-
-	//TGAImage floorDiff, floorNormal;
-	//floorDiff.read_tga_file("res/floor/floor_diffuse.tga"); // african_head_diffuse
-	//floorNormal.read_tga_file("res/floor/floor_nm_tangent.tga"); // african_head_diffuse
-
-	// Line
-	{
-		//DrawLine(image, 600, 700, 500, 500, white);
-		/*
-		DrawLine(image, 110, 10, 290, 160, red);
-		DrawLine(image, 290, 160, 200, 30, green);
-		DrawLine(image, 200, 30, 110, 10, blue);*/
-	}
-
-	// Filled Mesh
-	//TGAColor clearColor(255, 255, 255);
-	//TGAImage defFB(_G_WIDTH, _G_HEIGHT, TGAImage::RGB);
-	//defFB.clear();
-
-	//std::unique_ptr<float> zBuf(new float[defFB.get_width() * defFB.get_height()]);
-	//for (int i = 0, n = defFB.get_width() * defFB.get_height(); i < n; ++i) zBuf.get()[i] = fltMax;
-
-	//TGAImage shadowMap(_G_WIDTH, _G_HEIGHT, TGAImage::GRAYSCALE);
-	//for (int i = 0, w = shadowMap.get_width(); i < w; ++i) {
-	//	for (int j = 0, h = shadowMap.get_height(); j < h; ++j)
-	//	{
-	//		shadowMap.set(i, j, clearColor);
-	//	}
-	//}
-
-	//std::unique_ptr<float> shadowZBuf(new float[shadowMap.get_width() * shadowMap.get_height()]);
-	//for (int i = 0, n = shadowMap.get_width() * shadowMap.get_height(); i < n; ++i) shadowZBuf.get()[i] = fltMax;
-	//{
-	//	//TestOrtho(shadowMap, shadowZBuf.get(), Vec3(-1.2f, -0.6f, 0.6f), Vec3(-0.6f, 0.6f, 0), Vec3(0, -0.6f, -0.6f), white);
-	//	//TestOrtho(shadowMap, shadowZBuf.get(), Vec3(0.6f, 1.2f, 0), Vec3(0.f, .0f, 0.6f), Vec3(1.2f, 0.f, -0.6f), white);
-	//	//Test_SelfShadow(defFB, zBuf.get(), shadowZBuf.get(), Vec3(-1.2f, -0.6f, 0.6f), Vec3(-0.6f, 0.6f, 0), Vec3(0, -0.6f, -0.6f), white);
-	//	//Test_SelfShadow(defFB, zBuf.get(), shadowZBuf.get(), Vec3(0.6f, 1.2f, 0), Vec3(0.f, .0f, 0.6f), Vec3(1.2f, 0.f, -0.6f), white);
-	//	for (auto f : mesh->faces) {
-	//		auto v0 = mesh->vertices[f[0][0]];
-	//		auto v1 = mesh->vertices[f[1][0]];
-	//		auto v2 = mesh->vertices[f[2][0]];
-
-	//		auto uv0 = mesh->uv[f[0][1]];
-	//		auto uv1 = mesh->uv[f[1][1]];
-	//		auto uv2 = mesh->uv[f[2][1]];
-
-	//		auto n0 = mesh->normals[f[0][2]];
-	//		auto n1 = mesh->normals[f[1][2]];
-	//		auto n2 = mesh->normals[f[2][2]];
-	//		DrawFilledTrianxgleBarycentricCoordinate_Texture_Ortho(shadowMap, shadowZBuf.get(), v0, v1, v2, white);
-	//	}
-
-	//	for (auto f : mesh->faces) {
-	//		auto v0 = mesh->vertices[f[0][0]];
-	//		auto v1 = mesh->vertices[f[1][0]];
-	//		auto v2 = mesh->vertices[f[2][0]];
-
-	//		auto uv0 = mesh->uv[f[0][1]];
-	//		auto uv1 = mesh->uv[f[1][1]];
-	//		auto uv2 = mesh->uv[f[2][1]];
-
-	//		auto n0 = mesh->normals[f[0][2]];
-	//		auto n1 = mesh->normals[f[1][2]];
-	//		auto n2 = mesh->normals[f[2][2]];
-	//		DrawFilledTrianxgleBarycentricCoordinate_Texture_SelfShadow(defFB, texture, normalMap, specMap, zBuf.get(), shadowZBuf.get(), v0, v1, v2, uv0, uv1, uv2, n0, n1, n2, white);
-	//	}
-
-	//}
-	//
-	//defFB.flip_vertically();
-	//defFB.write_tga_file("output.tga");
-	//shadowMap.flip_vertically();
-	//shadowMap.write_tga_file("shadowMap.tga");
-
-	return 0;
 }

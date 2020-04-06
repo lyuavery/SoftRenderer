@@ -33,6 +33,7 @@ namespace sbm
 	Vec<T, N> Normalized() const { \
 		Vec<T, N> v; \
 		T mag = Magnitude(); \
+		if(mag == T(0)) return Vec<T, N>(0); \
 		for (size_t i = 0; i < N; ++i) { \
 				(&v.x)[i] = (&x)[i] / mag; \
 		} \
@@ -57,7 +58,7 @@ namespace sbm
 				(&v.x)[i] = (&x)[i]; \
 		} \
 		return v; \
-	}
+	} \
 
 	template<typename T, size_t N>
 	struct Vec {
@@ -79,7 +80,11 @@ namespace sbm
 			struct { T r, g; };
 			struct { T s, t; };
 		};
+		static const Vec<T, 2> zero, one;
 	};
+
+	template<typename T>
+	const Vec<T,2> Vec<T, 2>::zero = Vec<T, 2>(0), Vec<T, 2>::one = Vec<T, 2>(1);
 
 	template<typename T>
 	struct Vec<T, 3> {
@@ -97,7 +102,16 @@ namespace sbm
 		};
 
 		inline explicit operator Vec<T, 2>() { return Vec<T, 2>(x, y); }
+		static const Vec<T, 3> zero, one, front, up, right;
 	};
+	template<typename T>
+	const Vec<T, 3> Vec<T, 3>::zero = Vec<T, 3>(0), 
+		Vec<T, 3>::one = Vec<T, 3>(1),
+		Vec<T, 3>::front = Vec<T, 3>(0,0,-1),
+		Vec<T, 3>::up = Vec<T, 3>(0,1,0),
+		Vec<T, 3>::right = Vec<T, 3>(1,0,0)
+		;
+
 
 	template<typename T>
 	struct Vec<T, 4> {
@@ -117,7 +131,10 @@ namespace sbm
 
 		inline explicit operator Vec<T, 2>() { return Vec<T, 2>(x, y); }
 		inline explicit operator Vec<T, 3>() { return Vec<T, 3>(x, y, z); }
+		static const Vec<T, 4> zero, one;
 	};
+	template<typename T>
+	const Vec<T, 4> Vec<T, 4>::zero = Vec<T, 4>(0), Vec<T, 4>::one = Vec<T, 4>(1);
 
 	template<typename T, size_t N>
 	std::ostream& operator<<(std::ostream& out, Vec<T, N> vector)
@@ -220,12 +237,28 @@ namespace sbm
 		return ret;
 	}
 
+	template<typename T, size_t N>
+	Vec<T, N>& operator+=(Vec<T, N>& lhs, const Vec<T, N>& rhs)
+	{
+		for (size_t i = 0; i < N; ++i) {
+			lhs[i] = lhs[i] + rhs[i];
+		}
+		return lhs;
+	}
+
+	template<typename T, size_t N>
+	Vec<T, N>& operator-=(Vec<T, N>& lhs, const Vec<T, N>& rhs)
+	{
+		for (size_t i = 0; i < N; ++i) {
+			lhs[i] = lhs[i] - rhs[i];
+		}
+		return lhs;
+	}
+
 	/*template<typename T, size_t N>
 	Vec<T, N> operator=(const Vec<T, N>& lhs);
 	
-	template<typename T, size_t N>
-	Vec<T, N> operator==(const Vec<T, N>& lhs);
-
+	
 	template<typename T, size_t N>
 	Vec<T, N> operator!=(const Vec<T, N>& lhs);
 
@@ -233,12 +266,19 @@ namespace sbm
 	Vec<T, N> operator*=(const Vec<T, N>& lhs);
 
 	template<typename T, size_t N>
-	Vec<T, N> operator+=(const Vec<T, N>& lhs);
-
-	template<typename T, size_t N>
 	Vec<T, N> operator-=(const Vec<T, N>& lhs);
 
 	*/
+
+	template<typename T, size_t N>
+	bool operator==(const Vec<T, N>& lhs, const Vec<T, N>& rhs)
+	{
+		bool b = true;
+		for (size_t i = 0; i < N; ++i) {
+			b = b && (lhs[i] == rhs[i]);
+		}
+		return b;
+	}
 
 	template<typename T, size_t N>
 	Vec<T, N>& operator/=(Vec<T, N>& lhs, const T& v)

@@ -6,6 +6,7 @@
 #include "Singleton.h"
 #include "FrameBuffer.h"
 #include "Screen.h"
+#include "Input.h"
 namespace SR
 {
 	class Window :public Singleton<Window>
@@ -21,7 +22,9 @@ namespace SR
 		std::shared_ptr<FrameBuffer> frameBuffer;
 		bool bInit;
 		bool bExit;
-		Window() :bInit(false), bExit(false) {}
+		bool bFirstFocus;
+		Window() :bInit(false), bExit(false), bFirstFocus(true) {}
+		void GetCursorPos(float& x, float& y);
 	public:
 #ifdef UNICODE
 		static constexpr const wchar_t *DEFAULT_WINDOW_CLASS_NAME = L"MySoftRenderer";
@@ -51,6 +54,7 @@ namespace SR
 
 		void Dispatch()
 		{
+			SR::Input::ResetKey();
 			// Dispatch messages
 			MSG msg;
 			while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -72,7 +76,7 @@ namespace SR
 		//				compatibleHDC,BITMAPINFO-> CreateDIBSection ->hBmp, screenBuf
 		//					hBmp,compatibleHDC-> SelectObject ->hGDIObj
 		//	hDC,compatibleHDC-> BitBlt
-		int Init(int w, int h, bool topDown = true);
+		int Init(int w, int h, bool topDown);
 
 
 		bool ShouldExit() { return bExit; }

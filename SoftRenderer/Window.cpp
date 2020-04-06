@@ -1,18 +1,121 @@
 #include "Window.h"
 #include "Log.h"
+#include "Input.h"
+
+static SR::KeyCode TranslateVK2KeyCode(WPARAM param)
+{
+	SR::KeyCode code = SR::KeyCode::None;
+	do
+	{
+		if (param >= 'A' && param <= 'Z')
+		{
+			code = SR::KeyCode(int(param - 'A') + int(SR::KeyCode::A));
+			break;
+		}
+
+		if (param >= '0' && param <= '1')
+		{
+			code = SR::KeyCode(int(param - '0') + int(SR::KeyCode::Alpha0));
+			break;
+		}
+
+		if (param >= VK_NUMPAD0 && param <= VK_NUMPAD9)
+		{
+			code = SR::KeyCode(int(param - VK_NUMPAD0) + int(SR::KeyCode::Pad0));
+			break;
+		}
+
+		if (param >= VK_F1 && param <= VK_F12)
+		{
+			code = SR::KeyCode(int(param - VK_F1) + int(SR::KeyCode::F1));
+			break;
+		}
+
+		switch (param)
+		{
+		case VK_ESCAPE: { code = SR::KeyCode::Escape; break; }
+		case VK_CONTROL: { code = SR::KeyCode::LeftCtrl; break; }
+		case VK_TAB: { code = SR::KeyCode::Tab; break; }
+		default:break;
+		}
+	} while (false);
+	return code;
+}
+
+void SR::Window::GetCursorPos(float& x, float& y)
+{
+	// Screen Space
+	if (!handle) return;
+	POINT point;
+	::GetCursorPos(&point);
+	ScreenToClient(handle, &point);
+	x = point.x;
+	y = point.y;
+}
 
 LRESULT __stdcall SR::Window::MessageLoop(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	//WM_LBUTTONDOWN
-	//WM_RBUTTONDOWN
-	//WM_LBUTTONUP
-	//WM_RBUTTONUP
-	//WM_MOUSEWHEEL
-	//float offset = GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA;
+	auto& wnd = GetInstance();	
 	switch (msg) {
-	case WM_CLOSE: { GetInstance().bExit = true; break; }
-	case WM_KEYDOWN:/* screen_keys[wParam & 511] = 1;*/ break;
-	case WM_KEYUP: /*screen_keys[wParam & 511] = 0;*/ break;
+	case WM_CLOSE: { 
+		wnd.bExit = true; 
+		break; }
+	case WM_KEYDOWN: {
+		auto code = TranslateVK2KeyCode(wParam);
+		if(code == SR::KeyCode::Escape) wnd.bExit = true;
+		else SR::Input::SetKeyDown(code);
+		break; 
+	}
+	case WM_KEYUP: {
+		auto code = TranslateVK2KeyCode(wParam);
+		SR::Input::SetKeyUp(code);
+		break;
+	}
+	case WM_MOUSEMOVE: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		if (!wnd.bFirstFocus)
+		{
+			Input::NotifyMouseMoveListeners(x, y);
+		}
+		else
+		{
+			wnd.bFirstFocus = false;
+		}
+		break;
+	}
+	case WM_MBUTTONDOWN: { break; }
+	case WM_MBUTTONUP: { break; }
+	case WM_LBUTTONDOWN: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		Input::NotifyMouseButtonListeners(SR::KeyCode::LeftMouse, true, x, y); break;
+	}
+	case WM_LBUTTONUP: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		Input::NotifyMouseButtonListeners(SR::KeyCode::LeftMouse, false, x, y); break;
+	}
+	case WM_RBUTTONDOWN: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		Input::NotifyMouseButtonListeners(SR::KeyCode::RightMouse, true, x, y); break;
+	}
+	case WM_RBUTTONUP: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		Input::NotifyMouseButtonListeners(SR::KeyCode::RightMouse, false, x, y); break;
+	}
+	case WM_MOUSEWHEEL: {
+		float offset = GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA;
+		Input::NotifyWheelScrollListeners(offset);
+		break;
+	}
 	default: return DefWindowProc(hWnd, msg, wParam, lParam);
 	}
 	return 0;
