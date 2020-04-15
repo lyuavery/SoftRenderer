@@ -117,6 +117,7 @@
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Color.cpp" />
+    <ClCompile Include="FragmentShader.cpp" />
     <ClCompile Include="FrameBuffer.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="main.cpp" />
@@ -127,14 +128,18 @@
     <ClCompile Include="Math\Vector.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="MeshLoader.cpp" />
+    <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Time.cpp" />
+    <ClCompile Include="VertexShader.cpp" />
+    <ClCompile Include="Viewport.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Color.h" />
+    <ClInclude Include="FragmentShader.h" />
     <ClInclude Include="FrameBuffer.h" />
     <ClInclude Include="Header.h" />
     <ClInclude Include="Input.h" />
@@ -146,12 +151,16 @@
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshLoader.h" />
+    <ClInclude Include="RenderState.h" />
+    <ClInclude Include="Renderer.h" />
     <ClInclude Include="Screen.h" />
     <ClInclude Include="Sealed.h" />
     <ClInclude Include="Singleton.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="TextureLoader.h" />
     <ClInclude Include="Time.h" />
+    <ClInclude Include="TypeDef.h" />
+    <ClInclude Include="VertexShader.h" />
     <ClInclude Include="Viewport.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>

@@ -16,10 +16,13 @@ namespace sbm
 	struct Matrix
 	{
 	protected:
-		T value[NR*NC];// column major
+		T value[NTOTAL];// column major
 	public:
 		Matrix() = default;
-		Matrix(const Matrix&) = default;
+		using ElemType = T;
+		inline static constexpr size_t size() { return NR * NC; }
+		inline static constexpr size_t RowSize() { return NR; }
+		inline static constexpr size_t ColSize() { return NC; }
 
 		explicit Matrix(T& v);
 		explicit Matrix(T data[NTOTAL]);
@@ -33,24 +36,26 @@ namespace sbm
 		void SetColumn(int i, const sbm::Vec<T, NR>& col);
 		sbm::Vec<T, NR> GetColumn(int i);
 
-		T& M(int r, int c);
-		const T& M(int r, int c) const;
+		inline T& M(int r, int c);
+		inline const T& M(int r, int c) const;
 
 		void SetIdentity();
 		Matrix GetInversed();
 		static bool InverseMatrix(const Matrix& in, Matrix& out);
 		Matrix<NC, NR, T> GetTransposed();
 
-		T& operator[](int i);
-		const T& operator[](int i) const;
+		inline T& operator[](int i);
+		inline const T& operator[](int i) const;
 
+		inline Matrix operator*(const T& v);
+		Matrix& operator*=(const T& v);
+		template<size_t NR, size_t NC, typename T> friend Matrix operator*(const T& v, const Matrix<NR, NC, T>& m);
 		sbm::Vec<T, NR> operator*(const sbm::Vec<T, NC>& v);
 		template<size_t NR, size_t NC, typename T> friend sbm::Vec<T, 4> operator*(const sbm::Vec<T, NR>& v, const Matrix<NR, NC, T>& m);
 
 		template<size_t NX> Matrix<NR, NX, T> operator*(const Matrix<NC, NX, T>& m);
 
-		inline const size_t RowSize() const { return NR; }
-		inline const size_t ColSize() const { return NC; }
+		
 
 	};
 
@@ -176,6 +181,28 @@ namespace sbm
 			temp[r] = sum;
 		}
 		return temp;
+	}
+
+	template<size_t NR, size_t NC, typename T>
+	Matrix<NR, NC, T> Matrix<NR, NC, T>::operator*(const T& v)
+	{
+		Matrix<NR, NC, T> temp(*this);
+		return temp *= v;
+	}
+
+	template<size_t NR, size_t NC, typename T>
+	inline Matrix<NR, NC, T> operator*(const T& v, const Matrix<NR, NC, T>& m)
+	{
+		Matrix<NR, NC, T> temp(m);
+		return temp *= v;
+	}
+
+
+	template<size_t NR, size_t NC, typename T>
+	Matrix<NR, NC, T>& Matrix<NR, NC, T>::operator*=(const T& v)
+	{
+		for (int i = 0; i < NTOTAL; ++i) value[i] *= v;
+		return *this;
 	}
 
 	template<size_t NR, size_t NC, typename T>

@@ -43,6 +43,24 @@ namespace sbm
 		return ret;
 	}
 
+	template<typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+	inline T ceil(T x)
+	{
+		int _x = int(x);
+		if (x < 0) return _x;
+		if (_x < x) return int(x + 1);
+		return _x;
+	}
+
+	template<typename T, typename = std::enable_if_t<std::is_floating_point_v<T>>>
+	inline T floor(T x)
+	{
+		int _x = int(x);
+		if (x > 0) return _x;
+		if (_x > x) return int(x - 1);
+		return _x;
+	}
+
 	template<typename T>
 	inline T clamp(T x, T a, T b)
 	{
@@ -77,7 +95,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	sbm::Vec<T, 3> barycentric(const sbm::Vec<T, 2>& v0, const const sbm::Vec<T, 2>& v1, const const sbm::Vec<T, 2>& v2, const const sbm::Vec<T, 2>& p)
+	sbm::Vec<T, 3> barycentric(const sbm::Vec<T, 2>& v0, const sbm::Vec<T, 2>& v1, const sbm::Vec<T, 2>& v2, const sbm::Vec<T, 2>& p)
 	{
 		// (u, v, 1) 与（AB.x, AC.x, PA.x) 和（AB.y, AC.y, PA.y) 正交，
 		sbm::Vec<T, 3> lambda = Cross(sbm::Vec<T, 3>(v1.x - v0.x, v2.x - v0.x, v0.x - p.x), sbm::Vec<T, 3>(v1.y - v0.y, v2.y - v0.y, v0.y - p.y));

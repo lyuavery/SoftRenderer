@@ -241,6 +241,11 @@ Mat4 gProjMat;
 Vec3 gCameraPos;
 int main()
 {
+	std::cout << sizeof(Mat4::size()) << std::endl;
+	std::cout << sizeof(Vec4::size()) << std::endl;
+	std::cout << sizeof(sbm::Matrix<2,3>::size()) << std::endl;
+	getchar();
+	return 0;
 	SR::Camera::mainCamera = std::unique_ptr<SR::Camera>(new SR::Camera(Vec3(0,0,3), Vec3(0)));
 	auto& mainCam = *SR::Camera::mainCamera;
 	mainCam.viewport = SR::Viewport(0, 0, gWidth, gHeight, true);
@@ -254,10 +259,11 @@ int main()
 
 	auto& wnd = SR::Window::GetInstance();
 	wnd.Init(w, h, true);
-	auto backBuf = wnd.GetBackBuffer();
+	auto& backBuf = wnd.GetBackBuffer();
 	if (backBuf)
 	{
-		backBuf->Clear(SR::Color32::grey);
+		if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
+		if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f,0.f,0.f);
 	}
 	//SR::RenderTarget::active = backBuf;
 	//memset(screen_keys, 0, sizeof(int) * 512);
@@ -269,11 +275,11 @@ int main()
 
 	//std::unique_ptr<SR::Mesh> floor(SR::MeshLoader::GetInstance().Load("Resources/floor/floor.obj"));
 	float fltMax = sbm::Math::FloatMax;
-	std::unique_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
+	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
 	SR::TGALoader tgaLoader;
-	std::unique_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	std::unique_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	std::unique_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	std::shared_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	std::shared_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	std::shared_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
 
 	/*for (int j = 0, w = backBuf->colorBuf.GetWidth(), h = backBuf->colorBuf.GetHeight(); j < h; ++j)
 	{
@@ -284,15 +290,10 @@ int main()
 	}
 */
 	SR::Time::Init();
-	float prevTimeMark = SR::Time::TimeSinceSinceStartup();
-	float elapseTime = 0;
-	float elapseFrameCnt = 0;
+	float lastPrintTime = SR::Time::TimeSinceStartup();
 	while (!wnd.ShouldExit()) {
 		SR::Time::Update();		
-		float now = SR::Time::TimeSinceSinceStartup();
 		float deltaTime = SR::Time::DeltaTime();
-		elapseTime += deltaTime;
-		++elapseFrameCnt;
 
 		SR::Input::Update(deltaTime);
 		gViewMat = mainCam.ViewMatrix();
@@ -303,40 +304,60 @@ int main()
 			mainCam.Orbit(45, 45);
 		}
 
-		backBuf->Clear(SR::Color32::grey);
-		TestDraw(backBuf->colorBuf, backBuf->depthBuf,
-			//Vec3(-.5f, -.5f, .5f), Vec3(.5f, -.5f, -.5f), Vec3(0, .5f, 0),
-			//Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
-			//Vec3(1, 0, 1), Vec3(1, 0, 1), Vec3(1, 0, 1),
-			Vec3(-.5f, -.5f, .0f), Vec3(.5f, -.5f, .0f), Vec3(-.5f, .5f, 0),
-			Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
-			Vec3(0, 0, 1), Vec3(0, 0, 1), Vec3(0, 0, 1),
-			SR::Color::white
-			);
-		/*for (auto f : africanHead->faces) {
-			auto v0 = africanHead->vertices[f[0][0]];
-			auto v1 = africanHead->vertices[f[1][0]];
-			auto v2 = africanHead->vertices[f[2][0]];
-
-			auto uv0 = africanHead->uv[f[0][1]];
-			auto uv1 = africanHead->uv[f[1][1]];
-			auto uv2 = africanHead->uv[f[2][1]];
-
-			auto n0 = africanHead->normals[f[0][2]];
-			auto n1 = africanHead->normals[f[1][2]];
-			auto n2 = africanHead->normals[f[2][2]];
-			
-			DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(backBuf->colorBuf, *africanHeadDiffuse, *africanHeadNormal, *africanHeadSpec, backBuf->depthBuf, v0, v1, v2, uv0, uv1, uv2, n0, n1, n2);
-		}*/
-		wnd.Update(deltaTime);
-		if ((now - prevTimeMark) > 1)
+		if (backBuf)
 		{
-			std::cout << "FPS:" << (elapseFrameCnt / elapseTime) << std::endl;
-			prevTimeMark = now;
-			elapseTime = 0;
-			elapseFrameCnt = 0;
+			if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
+			if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f, 0.f, 0.f);
+		}
+		//TestDraw(backBuf->colorBuf, backBuf->depthBuf,
+		//	//Vec3(-.5f, -.5f, .5f), Vec3(.5f, -.5f, -.5f), Vec3(0, .5f, 0),
+		//	//Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
+		//	//Vec3(1, 0, 1), Vec3(1, 0, 1), Vec3(1, 0, 1),
+		//	Vec3(-.5f, -.5f, .0f), Vec3(.5f, -.5f, .0f), Vec3(-.5f, .5f, 0),
+		//	Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
+		//	Vec3(0, 0, 1), Vec3(0, 0, 1), Vec3(0, 0, 1),
+		//	SR::Color::white
+		//	);
+		{
+			auto& f = africanHead->indices;
+			//for (auto f : africanHead->faces)
+			for (int i = 0, n = africanHead->indices.size(); i < n; i += 3)
+			{
+				/*auto v0 = africanHead->vertices[f[0][0]];
+				auto v1 = africanHead->vertices[f[1][0]];
+				auto v2 = africanHead->vertices[f[2][0]];
+
+				auto uv0 = africanHead->uv[f[0][1]];
+				auto uv1 = africanHead->uv[f[1][1]];
+				auto uv2 = africanHead->uv[f[2][1]];
+
+				auto n0 = africanHead->normals[f[0][2]];
+				auto n1 = africanHead->normals[f[1][2]];
+				auto n2 = africanHead->normals[f[2][2]];*/
+				auto v0 = africanHead->vertices[f[i + 0]];
+				auto v1 = africanHead->vertices[f[i + 1]];
+				auto v2 = africanHead->vertices[f[i + 2]];
+
+				auto uv0 = africanHead->uvs[f[i + 1]];
+				auto uv1 = africanHead->uvs[f[i + 1]];
+				auto uv2 = africanHead->uvs[f[i + 1]];
+
+				auto n0 = africanHead->normals[f[i + 2]];
+				auto n1 = africanHead->normals[f[i + 2]];
+				auto n2 = africanHead->normals[f[i + 2]];
+				DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(*(backBuf->colorBuf), *africanHeadDiffuse, *africanHeadNormal, *africanHeadSpec, *(backBuf->depthBuf), v0, v1, v2, uv0, uv1, uv2, n0, n1, n2);
+			}
+		}
+		
+		wnd.Update(deltaTime);
+		float now = SR::Time::TimeSinceStartup();
+		if ((now - lastPrintTime) > 1)
+		{
+			std::cout << "FPS:" << SR::Time::FPS() << std::endl;
+			lastPrintTime = now;
 		}
 		wnd.Dispatch();
+		//Sleep(1);
 	}
 	wnd.Destroy();
 
@@ -442,9 +463,9 @@ void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(
 			}
 
 			lambda3 = lambda3 * Vec3(1.f / (screenw0), 1.f / (screenw1), 1.f / (screenw2));// auto
-			float screenw = Dot(lambda3, Vec3(1));
-			lambda3 /= screenw;
-			float screenz = 1 / screenw;// (screenz0 * lambda3[0] + screenz1 * lambda3[1] + screenz2 * lambda3[2]);
+			float screenw = 1.f/Dot(lambda3, Vec3(1));
+			lambda3 *= screenw;
+			float screenz = screenw;// (screenz0 * lambda3[0] + screenz1 * lambda3[1] + screenz2 * lambda3[2]);
 			//float screenz =  (screenV0.z * lambda3[0] + screenV1.z * lambda3[1] + screenV2.z * lambda3[2]);
 
 			//if (screenz >= zBuf.Get(j,i).r) continue;
@@ -466,9 +487,12 @@ void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(
 			float worldBitangentZ = (worldBitangent0.z * lambda3[0] + worldBitangent1.z * lambda3[1] + worldBitangent2.z * lambda3[2]);
 
 			// 采样
-			SR::Color32 albedo = tex.GetColor32(int(0.5f + texWidth * uvx), int(0.5f + texHeight * uvy));
-			SR::Color32 ncolor = normalMap.GetColor32(int(0.5f + normalWidth * uvx), int(0.5f + normalHeight * uvy));
-			SR::Color32 glosscolor = specMap.GetColor32(int(0.5f + specMapW * uvx), int(0.5f + specMapH * uvy));
+			SR::Color32 albedo;
+			tex.Get(int(0.5f + texWidth * uvx), int(0.5f + texHeight * uvy), albedo.r, albedo.g, albedo.b, albedo.a);
+			SR::Color32 ncolor;
+			normalMap.Get(int(0.5f + normalWidth * uvx), int(0.5f + normalHeight * uvy), ncolor.r, ncolor.g, ncolor.b, ncolor.a);
+			SR::Color32 glosscolor;
+			specMap.Get(int(0.5f + specMapW * uvx), int(0.5f + specMapH * uvy), glosscolor.r, glosscolor.g, glosscolor.b, glosscolor.a);
 
 			Vec3 pos(posx, posy, posz); // 引入法线变换后nz就不用反了
 			Vec4 norm = Vec4((ncolor.r / 255.f) * 2 - 1, (ncolor.g / 255.f) * 2 - 1, (ncolor.b / 255.f) * 2 - 1, 0);
@@ -493,7 +517,7 @@ void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(
 				sbm::clamp<int>(5 + albedo.b * (diffuse + spec), 0, 255)
 			);
 
-			image.SetColor32(j, i, c);
+			image.Set(j, i, c.r, c.g, c.b, c.a);
 		}
 	}
 }
@@ -645,7 +669,7 @@ void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 				sbm::clamp<int>(diffuse * 255, 0, 255)
 			);
 
-			image.SetColor32(j, i, c);
+			image.Set(j, i, c.r, c.g, c.b, c.a);
 		}
 	}
 }

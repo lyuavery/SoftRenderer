@@ -2,140 +2,176 @@
 
 #include "Math/Utility.h"
 
-void SR::FrameBufferAttachment::SetColor(int x, int y, const SR::Color& color)
+void SR::FrameBufferAttachment::Set(int x, int y, float r, float g, float b, float a)
 {
-	SR::Color32 color32 = SR::Color32(
-		sbm::clamp01(color.r) * 255,
-		sbm::clamp01(color.g) * 255,
-		sbm::clamp01(color.b) * 255,
-		sbm::clamp01(color.a) * 255
-	);
-	SetColor32(x,y, color32);
+	if (x >= width || x < 0 || y < 0 || y >= height) return;
+	auto offset = (x + y * width) * bytespp;
+	auto ptr = reinterpret_cast<Byte*>(buffer);
+
+	switch (format)
+	{
+	case SR::FrameBufferAttachmentFormat::Depth32: {
+		*((float*)(ptr + offset)) = r;
+		break;
+	}
+	case SR::FrameBufferAttachmentFormat::BGR24: 
+	case SR::FrameBufferAttachmentFormat::BGRA32:
+	case SR::FrameBufferAttachmentFormat::ARGB32: {
+		Set(x, y, Byte(sbm::clamp01(r) * 255),
+			Byte(sbm::clamp01(g) * 255),
+			Byte(sbm::clamp01(b) * 255),
+			Byte(sbm::clamp01(a) * 255));
+		break;
+	}
+	}
+	
 }
 
-void SR::FrameBufferAttachment::SetColor32(int x, int y, const SR::Color32& color32)
+void SR::FrameBufferAttachment::Set(int x, int y, Byte r, Byte g, Byte b, Byte a)
 {
-	/*SR::Color32 color32 = SR::Color32(
-		sbm::clamp01(color.r) * 255,
-		sbm::clamp01(color.g) * 255,
-		sbm::clamp01(color.b) * 255,
-		sbm::clamp01(color.a) * 255
-	);*/
+	if (x >= width || x < 0 || y < 0 || y >= height) return;
 	auto offset = (x + y * width) * bytespp;
 	auto ptr = reinterpret_cast<Byte*>(buffer);
 	switch (format)
 	{
 	case SR::FrameBufferAttachmentFormat::BGR24: {
-		*(ptr + offset) = color32.b;
-		*(ptr + offset + 1) = color32.g;
-		*(ptr + offset + 2) = color32.r;
+		*(ptr + offset) = b;
+		*(ptr + offset + 1) = g;
+		*(ptr + offset + 2) = r;
 		break;
 	}
 	case SR::FrameBufferAttachmentFormat::BGRA32: {
-		*(ptr + offset) = color32.b;
-		*(ptr + offset + 1) = color32.g;
-		*(ptr + offset + 2) = color32.r;
-		*(ptr + offset + 3) = color32.a;
+		*(ptr + offset) = b;
+		*(ptr + offset + 1) = g;
+		*(ptr + offset + 2) = r;
+		*(ptr + offset + 3) = a;
 		break;
 	}
 	case SR::FrameBufferAttachmentFormat::ARGB32: {
-		*(ptr + offset) = color32.a;
-		*(ptr + offset + 1) = color32.r;
-		*(ptr + offset + 2) = color32.g;
-		*(ptr + offset + 3) = color32.b;
+		*(ptr + offset) = a;
+		*(ptr + offset + 1) = r;
+		*(ptr + offset + 2) = g;
+		*(ptr + offset + 3) = b;
 		break;
 	}
-	case SR::FrameBufferAttachmentFormat::Depth8: {
-		*(ptr + offset) = color32.r;
+	case SR::FrameBufferAttachmentFormat::Depth32: {
+		float denom = 1.f / 255.f;
+		Set(x, y, r * denom, g * denom, b * denom, a * denom);
 		break;
 	}
-	default:
-		break;
 	}
 }
 
-SR::Color SR::FrameBufferAttachment::GetColor(int x, int y) const
+int SR::FrameBufferAttachment::Get(int x, int y, float& r, float& g, float& b, float& a) const
 {
-	Color color = Color(GetColor32(x,y));
-	return color;
+	if (x >= width || x < 0 || y < 0 || y >= height) return -1;
+	int components = 0;
+	auto ptr = reinterpret_cast<Byte*>(buffer);
+	auto offset = (x + y * width) * bytespp;
+	switch (format)
+	{
+	case SR::FrameBufferAttachmentFormat::BGR24: 
+	case SR::FrameBufferAttachmentFormat::BGRA32:
+	case SR::FrameBufferAttachmentFormat::ARGB32: {
+		Byte _r, _g, _b, _a;
+		components = Get(x, y, _r, _g, _b, _a);
+		r = _r, g = _g, b = _b, a = _a;
+		break;
+	}
+	case SR::FrameBufferAttachmentFormat::Depth32: {
+		components = 1;
+		r = *((float*)(ptr + offset));
+		break;
+	}
+	}
+	return components;
 }
 
-SR::Color32 SR::FrameBufferAttachment::GetColor32(int x, int y) const
+int SR::FrameBufferAttachment::Get(int x, int y, Byte& r, Byte& g, Byte& b, Byte& a) const
 {
-	Color32 color32(255);
+	if (x >= width || x < 0 || y < 0 || y >= height) return -1;
+	int components = 0;
 	auto ptr = reinterpret_cast<Byte*>(buffer);
 	auto offset = (x + y * width) * bytespp;
 	switch (format)
 	{
 	case SR::FrameBufferAttachmentFormat::BGR24: {
-		color32.b = *(ptr + offset);
-		color32.g = *(ptr + offset + 1);
-		color32.r = *(ptr + offset + 2);
+		components = 3;
+		b = *(ptr + offset);
+		g = *(ptr + offset + 1);
+		r = *(ptr + offset + 2);
 		break;
 	}
 	case SR::FrameBufferAttachmentFormat::BGRA32: {
-		color32.b = *(ptr + offset);
-		color32.g = *(ptr + offset + 1);
-		color32.r = *(ptr + offset + 2);
-		color32.a = *(ptr + offset + 3);
+		components = 4;
+		b = *(ptr + offset);
+		g = *(ptr + offset + 1);
+		r = *(ptr + offset + 2);
+		a = *(ptr + offset + 3);
 		break;
 	}
 	case SR::FrameBufferAttachmentFormat::ARGB32: {
-		color32.a = *(ptr + offset);
-		color32.r = *(ptr + offset + 1);
-		color32.g = *(ptr + offset + 2);
-		color32.b = *(ptr + offset + 3);
+		components = 4;
+		a = *(ptr + offset);
+		r = *(ptr + offset + 1);
+		g = *(ptr + offset + 2);
+		b = *(ptr + offset + 3);
 		break;
 	}
-	case SR::FrameBufferAttachmentFormat::Depth8: {
-		color32 = SR::Color32(*(ptr + offset));
+	case SR::FrameBufferAttachmentFormat::Depth32: {
+		float _r, _g, _b, _a;
+		components = Get(x, y, _r, _g, _b, _a);
+		r = _r, g = _g, b = _b, a = _a;
 		break;
 	}
-	default:
-		break;
 	}
-	return color32;
+	return components;
 }
 
-void SR::FrameBufferAttachment::Clear(const Color& color)
+void SR::FrameBufferAttachment::Clear(float r, float g, float b, float a)
 {
 	if (!buffer) return;
 	for (int j = 0; j < height; ++j)
 	{
 		for (int i = 0; i < width; ++i)
 		{
-			SetColor(i, j, color);
+			Set(i, j, r, g, b, a);
 		}
 	}
 }
 
-void SR::FrameBufferAttachment::Clear(const Color32& color32)
+void SR::FrameBufferAttachment::Clear(Byte r, Byte g, Byte b, Byte a)
 {
 	if (!buffer) return;
 	for (int j = 0; j < height; ++j)
 	{
 		for (int i = 0; i < width; ++i)
 		{
-			SetColor32(i, j, color32);
+			Set(i, j, r, g, b, a);
 		}
 	}
 }
 
 int SR::FrameBufferAttachment::GetFormatBytesPerPixel(SR::FrameBufferAttachmentFormat fmt)
 {
-	int m = 0;
 	int n = GetFormatChannels(fmt);
+	int elemSize = 0;
 	switch (fmt)
 	{
 	case SR::FrameBufferAttachmentFormat::BGRA32:
 	case SR::FrameBufferAttachmentFormat::ARGB32:
 	case SR::FrameBufferAttachmentFormat::BGR24:
-	case SR::FrameBufferAttachmentFormat::Depth8:
 	{
-		m = n * sizeof(Byte);
+		elemSize = sizeof(Byte);
+		break;
+	}
+	case SR::FrameBufferAttachmentFormat::Depth32:
+	{
+		elemSize = sizeof(float);
+		break;
 	}
 	}
-	return m;
+	return n * elemSize;
 }
 
 int SR::FrameBufferAttachment::GetFormatChannels(SR::FrameBufferAttachmentFormat fmt)
@@ -154,7 +190,7 @@ int SR::FrameBufferAttachment::GetFormatChannels(SR::FrameBufferAttachmentFormat
 		n = 3;
 		break;
 	}
-	case SR::FrameBufferAttachmentFormat::Depth8:
+	case SR::FrameBufferAttachmentFormat::Depth32:
 	{
 		n = 1;
 		break;

@@ -36,7 +36,7 @@ namespace SR
 		// GetBackBuffer不一定成功，这时候应该返回什么
 		// 用智能指针
 		// 希望渲染过程不用检查target
-		inline std::shared_ptr<FrameBuffer> GetBackBuffer() { return frameBuffer; }
+		inline std::shared_ptr<FrameBuffer>& GetBackBuffer() { return frameBuffer; }
 
 		static Window& GetInstance()
 		{

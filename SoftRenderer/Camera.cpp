@@ -202,19 +202,16 @@ void SR::Camera::OnMouseMove(float posX, float posY)
 	{
 		if (mode & int(Mode::Rotate))
 		{
-			//XLogInfo("Rotating! X: %lf, Y: %lf", xOffset * mouseRotateSensitivity , -yOffset * mouseRotateSensitivity);
 			Rotate(-xOffset * mouseRotateSensitivity, -yOffset * mouseRotateSensitivity);
 		}
 		else
 		{
-			//XLogInfo("Orbiting! X: %lf, Y: %lf", xOffset * angularSpeed, yOffset * angularSpeed);
 			// +y offset -theta, +x offset - phi
 			Orbit(-xOffset * angularSpeed, -yOffset * angularSpeed);
 		}
 	}
 	else if (mode & int(Mode::Pan))
 	{
-		//XLogInfo("Panning! X: %lf, Y: %lf", xOffset * mouseDragSensitivity, yOffset * mouseDragSensitivity);
 		Pan(xOffset * mouseDragSensitivity, yOffset * mouseDragSensitivity);
 	}
 }
@@ -281,12 +278,13 @@ void SR::Camera::Rotate(float deltaYaw, float deltaPitch, bool constrain)
 
 void SR::Camera::Zoom(float yoffset)
 {
-	if (fov >= 1.0f && fov <= 75.0f)
+	fov = sbm::clamp(fov - yoffset, 20.0f, 130.0f);
+	/*if (fov >= 20.0f && fov <= 75.0f)
 		fov -= yoffset;
-	if (fov <= 1.0f)
-		fov = 1.0f;
+	if (fov <= 20.0f)
+		fov = 20.0f;
 	if (fov >= 75.0f)
-		fov = 75.0f;
+		fov = 75.0f;*/
 }
 
 void SR::Camera::UpdateCameraBasis()

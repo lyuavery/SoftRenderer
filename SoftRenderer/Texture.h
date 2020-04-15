@@ -1,8 +1,8 @@
 #pragma once
 #include <memory>
 
-#include "Header.h"
 #include "Color.h"
+#include "TypeDef.h"
 
 namespace SR
 {
@@ -32,13 +32,20 @@ namespace SR
 		virtual int GetBytesPerPixel() const  { return bytespp; }
 		virtual int GetChannels() const  { return channels; }
 
-		virtual void SetColor(int x, int y, const Color&) = 0;
+		/*virtual void SetColor(int x, int y, const Color&) = 0;
 		virtual void SetColor32(int x, int y, const Color32&) = 0;
 		virtual inline Color GetColor(int x, int y) const = 0;
 		virtual inline Color32 GetColor32(int x, int y) const = 0;
 		virtual void Clear(const Color& c = Color::black) = 0;
-		virtual void Clear(const Color32& c = Color32::black) = 0;
+		virtual void Clear(const Color32& c = Color32::black) = 0;*/
 		
+		virtual void Set(int x, int y, Byte, Byte, Byte, Byte) = 0;
+		virtual void Set(int x, int y, float, float, float, float) = 0;
+		virtual inline int Get(int x, int y, Byte&, Byte&, Byte&, Byte&) const = 0;
+		virtual inline int Get(int x, int y, float&, float&, float&, float&) const = 0;
+		virtual void Clear(Byte, Byte, Byte, Byte) = 0;
+		virtual void Clear(float, float, float, float) = 0;
+
 		virtual ~Texture() {
 			if (buffer) {
 				delete[] buffer;
@@ -60,12 +67,18 @@ namespace SR
 		Texture2D(Texture2D&& t) :Texture(t.width, t.height, GetFormatChannels(t.format), GetFormatBytesPerPixel(t.format), t.buffer), format(t.format)
 		{ }
 		
-		virtual void SetColor(int x, int y, const Color&) override;
+		/*virtual void SetColor(int x, int y, const Color&) override;
 		virtual void SetColor32(int x, int y, const Color32&) override;
 		virtual Color GetColor(int x, int y) const override;
 		virtual Color32 GetColor32(int x, int y) const override;
 		virtual void Clear(const Color& c) override;
-		virtual void Clear(const Color32& c) override;
+		virtual void Clear(const Color32& c) override;*/
+		virtual void Set(int x, int y, Byte, Byte, Byte, Byte);
+		virtual void Set(int x, int y, float, float, float, float);
+		virtual int Get(int x, int y, Byte&, Byte&, Byte&, Byte&) const ;
+		virtual int Get(int x, int y, float&, float&, float&, float&) const;
+		virtual void Clear(Byte, Byte, Byte, Byte);
+		virtual void Clear(float, float, float, float);
 		void FlipVertically();
 		void FlipHorizontally();
 

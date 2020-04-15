@@ -22,7 +22,9 @@ namespace sbm
 		T value[16];// column major
 	public:
 		Matrix() = default;
-		Matrix(const Matrix&) = default;
+
+		using ElemType = T;
+		inline static constexpr size_t size() { return 16; }
 
 		explicit Matrix(T& v)
 		{
@@ -40,21 +42,24 @@ namespace sbm
 			for (int i = 0; i < 16; ++i) value[i] = data[i];
 		}
 
-		void SetRow(int i, T x, T y, T z, T w);
-		void SetRow(int i, const sbm::Vec<T, 4>& v4);
-		sbm::Vec<T, 4> GetRow(int i);
+		inline void SetRow(int i, T x, T y, T z, T w);
+		inline void SetRow(int i, const sbm::Vec<T, 4>& v4);
+		inline sbm::Vec<T, 4> GetRow(int i);
 
-		void SetColumn(int i, T x, T y, T z, T w);
-		void SetColumn(int i, const sbm::Vec<T, 4>& v4);
-		sbm::Vec<T, 4> GetColumn(int i);
-		T& M(int r, int c);
+		inline void SetColumn(int i, T x, T y, T z, T w);
+		inline void SetColumn(int i, const sbm::Vec<T, 4>& v4);
+		inline sbm::Vec<T, 4> GetColumn(int i);
+		inline T& M(int r, int c);
 
-		void SetIdentity();
+		inline void SetIdentity();
 		Matrix GetInversed();
-		Matrix GetTransposed();
+		inline Matrix GetTransposed();
 
-		Matrix operator*(const Matrix& m4);
+		inline Matrix operator*(const T& scale);
+		inline Matrix operator*(const Matrix& m4);
+		template<typename T> friend Matrix operator*(const T& scale, const Matrix<4,4,T>& m4);
 		Matrix& operator*=(const Matrix& m4);
+		inline Matrix& operator*=(const T& scale);
 		sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4);
 		template<size_t NX> Matrix<4, NX, T> operator*(const Matrix<4, NX, T>& m4);
 		template<typename T> friend std::ostream& operator<<(std::ostream& out, const Matrix<4, 4, T>& m4);
@@ -63,8 +68,6 @@ namespace sbm
 		inline const size_t RowSize() const { return 4; }
 		inline const size_t ColSize() const { return 4; }
 
-		operator Matrix<3, 3, T>();
-
 		static const Matrix<4, 4, T> Identity;
 		static bool InverseMatrix(const Matrix<4, 4, T>& in, Matrix<4, 4, T>& out);
 		static Matrix<4, 4, T> TRS(const Vec<T, 3>& translation, const Vec<T, 3>& rotation, const Vec<T, 3>& scale);
@@ -72,8 +75,10 @@ namespace sbm
 		static Matrix<4, 4, T> Rotate(const Vec<T, 3>& rotation);
 		static Matrix<4, 4, T> Scale(const Vec<T, 3>& scale);
 		static Matrix<4, 4, T> LookAt(const Vec<T, 3>& eye, const Vec<T, 3>& position, const Vec<T, 3>& up);
+
 		/*static Matrix<4, 4, T> Frustum(T left, T right, T bottom, T top, T nearClip, T farClip);
 		static Matrix<4, 4, T> Ortho(const Vec3& eye, T nearClip, T farClip);*/
+		//inline operator Matrix<3, 3, T>();
 	};
 
 	template<typename T>
@@ -150,6 +155,20 @@ namespace sbm
 	}
 
 	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::operator*(const T& scale)
+	{
+		Matrix<4, 4, T> temp(*this);
+		return temp *= scale;
+	}
+
+	template<typename T>
+	inline Matrix<4, 4, T> operator*(const T& scale, const Matrix<4, 4, T>& m4)
+	{
+		Matrix<4, 4, T> temp(m4);
+		return temp *= scale;
+	}
+
+	template<typename T>
 	Matrix<4, 4, T> Matrix<4, 4, T>::operator*(const Matrix& m4)
 	{
 		Matrix<4, 4, T> temp(*this);
@@ -159,8 +178,8 @@ namespace sbm
 	template<typename T>
 	Matrix<4, 4, T>& Matrix<4, 4, T>::operator*=(const Matrix<4, 4, T>& m4)
 	{
-		assert(&m4 != this);
-		Matrix<4, 4, T> temp;
+		//assert(&m4 != this);
+		Matrix<4, 4, T> temp; // ±ÿ–Î¥¥Ω®¡Ÿ ±æÿ’Û£¨±‹√‚‘™Àÿ∏≤∏«
 		for (int i = 0; i < 4; ++i)
 		{
 			MAT(temp, 0, i) = _M(0, 0) * MAT(m4, 0, i) + _M(0, 1) * MAT(m4, 1, i) + _M(0, 2) * MAT(m4, 2, i) + _M(0, 3) * MAT(m4, 3, i);
@@ -169,6 +188,16 @@ namespace sbm
 			MAT(temp, 3, i) = _M(3, 0) * MAT(m4, 0, i) + _M(3, 1) * MAT(m4, 1, i) + _M(3, 2) * MAT(m4, 2, i) + _M(3, 3) * MAT(m4, 3, i);
 		}
 		*this = temp;
+		return *this;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T>& Matrix<4, 4, T>::operator*=(const T& scale)
+	{
+		_M(0, 0) *= scale; _M(0, 1) *= scale; _M(0, 2) *= scale; _M(0, 3) *= scale;
+		_M(1, 0) *= scale; _M(1, 1) *= scale; _M(1, 2) *= scale; _M(1, 3) *= scale;
+		_M(2, 0) *= scale; _M(2, 1) *= scale; _M(2, 2) *= scale; _M(2, 3) *= scale;
+		_M(3, 0) *= scale; _M(3, 1) *= scale; _M(3, 2) *= scale; _M(3, 3) *= scale;
 		return *this;
 	}
 
@@ -189,20 +218,20 @@ namespace sbm
 		r0 = wtmp[0], r1 = wtmp[1], r2 = wtmp[2], r3 = wtmp[3];
 
 		r0[0] = MAT(in, 0, 0), r0[1] = MAT(in, 0, 1),
-			r0[2] = MAT(in, 0, 2), r0[3] = MAT(in, 0, 3),
-			r0[4] = 1.0, r0[5] = r0[6] = r0[7] = 0.0,
+		r0[2] = MAT(in, 0, 2), r0[3] = MAT(in, 0, 3),
+		r0[4] = 1.0, r0[5] = r0[6] = r0[7] = 0.0,
 
-			r1[0] = MAT(in, 1, 0), r1[1] = MAT(in, 1, 1),
-			r1[2] = MAT(in, 1, 2), r1[3] = MAT(in, 1, 3),
-			r1[5] = 1.0, r1[4] = r1[6] = r1[7] = 0.0,
+		r1[0] = MAT(in, 1, 0), r1[1] = MAT(in, 1, 1),
+		r1[2] = MAT(in, 1, 2), r1[3] = MAT(in, 1, 3),
+		r1[5] = 1.0, r1[4] = r1[6] = r1[7] = 0.0,
 
-			r2[0] = MAT(in, 2, 0), r2[1] = MAT(in, 2, 1),
-			r2[2] = MAT(in, 2, 2), r2[3] = MAT(in, 2, 3),
-			r2[6] = 1.0, r2[4] = r2[5] = r2[7] = 0.0,
+		r2[0] = MAT(in, 2, 0), r2[1] = MAT(in, 2, 1),
+		r2[2] = MAT(in, 2, 2), r2[3] = MAT(in, 2, 3),
+		r2[6] = 1.0, r2[4] = r2[5] = r2[7] = 0.0,
 
-			r3[0] = MAT(in, 3, 0), r3[1] = MAT(in, 3, 1),
-			r3[2] = MAT(in, 3, 2), r3[3] = MAT(in, 3, 3),
-			r3[7] = 1.0, r3[4] = r3[5] = r3[6] = 0.0;
+		r3[0] = MAT(in, 3, 0), r3[1] = MAT(in, 3, 1),
+		r3[2] = MAT(in, 3, 2), r3[3] = MAT(in, 3, 3),
+		r3[7] = 1.0, r3[4] = r3[5] = r3[6] = 0.0;
 
 		/* choose pivot - or die */
 		if (sbm::abs(r3[0]) > sbm::abs(r2[0])) SWAP_ROWS(r3, r2);
@@ -257,31 +286,31 @@ namespace sbm
 		m2 = r2[3];                 /* now back substitute row 2 */
 		s = 1.0F / r2[2];
 		r2[4] = s * (r2[4] - r3[4] * m2), r2[5] = s * (r2[5] - r3[5] * m2),
-			r2[6] = s * (r2[6] - r3[6] * m2), r2[7] = s * (r2[7] - r3[7] * m2);
+		r2[6] = s * (r2[6] - r3[6] * m2), r2[7] = s * (r2[7] - r3[7] * m2);
 		m1 = r1[3];
 		r1[4] -= r3[4] * m1, r1[5] -= r3[5] * m1,
-			r1[6] -= r3[6] * m1, r1[7] -= r3[7] * m1;
+		r1[6] -= r3[6] * m1, r1[7] -= r3[7] * m1;
 		m0 = r0[3];
 		r0[4] -= r3[4] * m0, r0[5] -= r3[5] * m0,
-			r0[6] -= r3[6] * m0, r0[7] -= r3[7] * m0;
+		r0[6] -= r3[6] * m0, r0[7] -= r3[7] * m0;
 
 		m1 = r1[2];                 /* now back substitute row 1 */
 		s = 1.0F / r1[1];
 		r1[4] = s * (r1[4] - r2[4] * m1), r1[5] = s * (r1[5] - r2[5] * m1),
-			r1[6] = s * (r1[6] - r2[6] * m1), r1[7] = s * (r1[7] - r2[7] * m1);
+		r1[6] = s * (r1[6] - r2[6] * m1), r1[7] = s * (r1[7] - r2[7] * m1);
 		m0 = r0[2];
 		r0[4] -= r2[4] * m0, r0[5] -= r2[5] * m0,
-			r0[6] -= r2[6] * m0, r0[7] -= r2[7] * m0;
+		r0[6] -= r2[6] * m0, r0[7] -= r2[7] * m0;
 
 		m0 = r0[1];                 /* now back substitute row 0 */
 		s = 1.0F / r0[0];
 		r0[4] = s * (r0[4] - r1[4] * m0), r0[5] = s * (r0[5] - r1[5] * m0),
-			r0[6] = s * (r0[6] - r1[6] * m0), r0[7] = s * (r0[7] - r1[7] * m0);
+		r0[6] = s * (r0[6] - r1[6] * m0), r0[7] = s * (r0[7] - r1[7] * m0);
 
 		MAT(out, 0, 0) = r0[4]; MAT(out, 0, 1) = r0[5], MAT(out, 0, 2) = r0[6]; MAT(out, 0, 3) = r0[7],
-			MAT(out, 1, 0) = r1[4]; MAT(out, 1, 1) = r1[5], MAT(out, 1, 2) = r1[6]; MAT(out, 1, 3) = r1[7],
-			MAT(out, 2, 0) = r2[4]; MAT(out, 2, 1) = r2[5], MAT(out, 2, 2) = r2[6]; MAT(out, 2, 3) = r2[7],
-			MAT(out, 3, 0) = r3[4]; MAT(out, 3, 1) = r3[5], MAT(out, 3, 2) = r3[6]; MAT(out, 3, 3) = r3[7];
+		MAT(out, 1, 0) = r1[4]; MAT(out, 1, 1) = r1[5], MAT(out, 1, 2) = r1[6]; MAT(out, 1, 3) = r1[7],
+		MAT(out, 2, 0) = r2[4]; MAT(out, 2, 1) = r2[5], MAT(out, 2, 2) = r2[6]; MAT(out, 2, 3) = r2[7],
+		MAT(out, 3, 0) = r3[4]; MAT(out, 3, 1) = r3[5], MAT(out, 3, 2) = r3[6]; MAT(out, 3, 3) = r3[7];
 
 		return true;
 	}
@@ -384,7 +413,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4, const sbm::Matrix<4, 4, T>& m4)
+	inline sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4, const sbm::Matrix<4, 4, T>& m4)
 	{
 		return sbm::Vec<T, 4>(
 			v4[0] * MAT(m4, 0, 0) + v4[1] * MAT(m4, 1, 0) + v4[2] * MAT(m4, 2, 0) + v4[3] * MAT(m4, 3, 0),

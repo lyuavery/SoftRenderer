@@ -1,8 +1,8 @@
 #include <fstream>
 #include "TextureLoader.h"
-#include "Texture.h"
 #include "Log.h"
-
+#include "Texture.h"
+#include "FrameBuffer.h"
 SR::Texture2D* SR::TGALoader::Load(const char *filename)
 {
 	if (!filename) return nullptr;

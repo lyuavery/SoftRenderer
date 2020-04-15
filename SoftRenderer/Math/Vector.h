@@ -9,9 +9,9 @@ namespace sbm
 
 /* =================  Vector  ================= */
 #define SBM_VEC_BODY(T, N) \
-	explicit Vec() { \
-		for (size_t i = 0; i < N; ++i) (&x)[i] = T(); \
-	} \
+	using ElemType = T; \
+	static constexpr size_t size() { return N; }; \
+	Vec() = default; \
 	explicit Vec(T val) { \
 		for (size_t i = 0; i < N; ++i) (&x)[i] = val; \
 	} \
@@ -39,8 +39,7 @@ namespace sbm
 		} \
 		return v; \
 	} \
-	size_t Size() const { return N; } \
-	template<size_t M> Vec<T, M> Expanded(const T& fill) { \
+	template<size_t M> Vec<T, M> Expanded(const T& fill) const { \
 		static_assert(M > N, "Expanded vector should have more component than the current one."); \
 		Vec<T, M> v; \
 		for (size_t i = 0; i < N; ++i) { \
@@ -51,7 +50,7 @@ namespace sbm
 		} \
 		return v; \
 	} \
-	template<size_t M> Vec<T, M> Truncated() { \
+	template<size_t M> Vec<T, M> Truncated() const { \
 		static_assert(M < N, "Expanded vector should have less component than the current one."); \
 		Vec<T, M> v; \
 		for (size_t i = 0; i < M; ++i) { \
@@ -262,13 +261,21 @@ namespace sbm
 	template<typename T, size_t N>
 	Vec<T, N> operator!=(const Vec<T, N>& lhs);
 
-	template<typename T, size_t N>
-	Vec<T, N> operator*=(const Vec<T, N>& lhs);
-
+	
 	template<typename T, size_t N>
 	Vec<T, N> operator-=(const Vec<T, N>& lhs);
 
 	*/
+
+	template<typename T, size_t N>
+	Vec<T, N>& operator*=(Vec<T, N>& lhs, const Vec<T, N>& rhs)
+	{
+		for (size_t i = 0; i < N; ++i) {
+			lhs[i] *= rhs[i];
+		}
+		return lhs;
+	}
+
 
 	template<typename T, size_t N>
 	bool operator==(const Vec<T, N>& lhs, const Vec<T, N>& rhs)
