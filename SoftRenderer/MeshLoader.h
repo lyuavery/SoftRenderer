@@ -19,7 +19,7 @@ namespace SR
 			OBJ
 		};
 
-		class Mesh* Load(const std::string& fileName, bool bGenerateTangents = false);
+		class Mesh* Load(const std::string& fileName, bool bGenerateTangents = false, bool bGenerateNormals = false);
 
 
 	private:
@@ -31,7 +31,7 @@ namespace SR
 		void GenerateTangents(Mesh* mesh);
 
 		// 适配不同格式文件
-		Mesh* LoadObj(const std::string& fileName);
+		Mesh* LoadObj(const std::string& fileName, bool bGenerateNormals);
 	};
 }
 

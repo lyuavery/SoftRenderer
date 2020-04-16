@@ -73,8 +73,10 @@ namespace SR
 		std::shared_ptr<const Uniform> uniform;
 		VertexShaderOutput Dispatch(int iid, int vid, VertexShaderInput& input) // TODO：做多线程分发的
 		{
-			std::shared_ptr<Varying> v(varying->Clone());
+			std::shared_ptr<Varying> v(varying ? varying->Clone() : nullptr);
 			VertexShaderOutput output = (*shader)(input, v, uniform);
+			if (output.gl_Position.w == 0) output.gl_Position.w = 0.0000001f;
+			output.gl_VertexID = vid;
 			output.varying = v;
 			return output;
 		}
@@ -91,7 +93,7 @@ namespace SR
 		FragmentShaderOutput Dispatch(FragmentShaderInput& input) // TODO：做多线程分发的
 		{
 			FragmentShaderOutput output;
-			auto varying = std::const_pointer_cast<const Varying>(input.varying);
+			std::shared_ptr<const Varying> varying = std::const_pointer_cast<const Varying>(input.varying);
 			input.varying.reset();
 			output.gl_FragCoord = input.gl_FragCoord;
 			output.color = (*shader)(input, varying, uniform);
@@ -112,31 +114,30 @@ namespace SR
 	public:
 		RenderState state;
 		std::shared_ptr<FrameBuffer> frameBuffer;
-		void Viewport(const SR::Viewport& v)
+		void Viewport(const SR::Viewport* const v)
 		{
-			viewport = std::make_shared<SR::Viewport>(v);
+			if (v) viewport.reset(new SR::Viewport(*v));;
 		}
 
 		void Bind(const Uniform* const u)
 		{
-			uniform.reset(u->Clone());
+			if(u) uniform.reset(u->Clone());
 		}
 
-		void Bind(const VertexShader* const vs, const Varying* const v)
+		void Bind(const VertexShader* const vs, const Varying* const v = nullptr)
 		{
-			vert.reset(vs->Clone());
-			varying.reset(v->Clone());
+			if(vs) vert.reset(vs->Clone());
+			if(v) varying.reset(v->Clone());
 		}
 
 		void Bind(const FragmentShader* const f)
 		{
-			frag.reset(f->Clone());
+			if (f) frag.reset(f->Clone());
 		}
 
-		void Bind(const SR::Mesh* const m, int attrib)
+		void Bind(const SR::Mesh* const m, int attrib = -1)
 		{
-			if (!m) return;
-			mesh.reset(new Mesh(*m, attrib));
+			if(m) mesh.reset(new Mesh(*m, attrib));
 		}
 
 		void Submit();

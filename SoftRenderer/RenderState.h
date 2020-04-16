@@ -5,13 +5,37 @@
 #include "Color.h"
 namespace SR
 {
-	struct Varying { // 只接受float
-		virtual int size() const final { return sizeof(*this) / 4; }
+	struct Varying { // 只能用float，且需要4字节对齐，因为未支持其他类型的插值
+		using ElemType = float;
+		virtual int size() const = 0;
 		virtual Varying* Clone(bool bCopy = false) const = 0;
+
+		void* DataPtr() const { return ((char*)this) + sizeof(void*); }
+		ElemType& operator[](int i) const { return *(((ElemType*)DataPtr()) + i); }
+	};
+
+	template<typename T>
+	struct IVarying : Varying { // 只能用float，且需要4字节对齐，因为未支持其他类型的插值
+		virtual constexpr int size() const override {
+			static_assert((sizeof(T) / sizeof(ElemType)) == (float(sizeof(T)) / sizeof(ElemType)), "Not align to ElemType");
+			return sizeof(T) / sizeof(ElemType) - 1;
+		}
+		virtual Varying* Clone(bool bCopy = false) const override
+		{
+			return new T;
+		}
 	};
 
 	struct Uniform {
 		virtual Uniform* Clone(bool bCopy = false) const = 0;
+	};
+
+	template<typename T>
+	struct IUniform : Uniform { // 只能用float，且需要4字节对齐，因为未支持其他类型的插值
+		virtual Uniform* Clone(bool bCopy = false) const override
+		{
+			return new T;
+		}
 	};
 
 	enum class BlendOp

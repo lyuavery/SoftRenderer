@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <sstream>
 #include <fstream>
-
+#include <unordered_map>
 #include "Header.h"
 #include "Log.h"
 #include "MeshLoader.h"
@@ -15,7 +15,7 @@
 #include "Math/Matrix4x4.h"
 #include "Math/Vector.h"
 
-SR::Mesh* SR::MeshLoader::Load(const std::string& fileName, bool bGenerateTangents)
+SR::Mesh* SR::MeshLoader::Load(const std::string& fileName, bool bGenerateTangents, bool bGenerateNormals)
 {
 	Mesh* mesh = nullptr;
 	do
@@ -30,7 +30,7 @@ SR::Mesh* SR::MeshLoader::Load(const std::string& fileName, bool bGenerateTangen
 			c = tolower(c);
 		}
 		if (ext == "obj") {
-			return LoadObj(fileName);
+			return LoadObj(fileName, bGenerateNormals);
 		}
 		else {
 			XLogWarning("Unsopported file ext: %s", ext.c_str());
@@ -39,6 +39,7 @@ SR::Mesh* SR::MeshLoader::Load(const std::string& fileName, bool bGenerateTangen
 	} while (false);
 	if (bGenerateTangents)
 	{
+		mesh->EnableAttribute(true, VertexAttribute::Tangents);
 		GenerateTangents(mesh);
 	}
 	if (mesh)
@@ -52,7 +53,7 @@ SR::Mesh* SR::MeshLoader::Load(const std::string& fileName, bool bGenerateTangen
 	return mesh;
 }
 
-SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName)
+SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNormals)
 {
 	std::ifstream in;
 	in.open(fileName, std::ifstream::in);
@@ -60,46 +61,116 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName)
 		XLogError("Fail to open file: %s.", fileName.c_str());
 		return nullptr;
 	}
+
 	SR::Mesh* mesh = new SR::Mesh;
 	std::string line;
+	bool bSortUVs = false;
+	std::vector<UInt32> uvIndices;
+	bool bSortNormals = false;
+	std::vector<UInt32> normalIndices;
+	bool hasVertices = false;
+	bool hasIndices = false;
+
 	while (!in.eof()) {
 		std::getline(in, line);
 		std::istringstream iss(line);
 		char trash;
 		if (!line.compare(0, 2, "v ")) {
+			hasVertices = true;
 			iss >> trash;
 			Vec3 v;
 			for (int i = 0; i < 3; i++) iss >> v[i];
 			mesh->vertices.push_back(v);
 		}
 		else if (!line.compare(0, 3, "vn ")) {
+			if (bGenerateNormals) continue;
+			mesh->EnableAttribute(true, VertexAttribute::Normals);
 			iss >> trash >> trash;
 			Vec3 n;
 			for (int i = 0; i < 3; i++) iss >> n[i];
 			mesh->normals.push_back(n);
 		}
 		else if (!line.compare(0, 3, "vt ")) {
+			mesh->EnableAttribute(true, VertexAttribute::UVs);
 			iss >> trash >> trash;
 			Vec2 uv;
 			for (int i = 0; i < 2; i++) iss >> uv[i];
 			mesh->uvs.push_back(uv);
 		}
 		else if (!line.compare(0, 2, "f ")) {
-			//std::vector<Vec3i> f;
+			hasIndices = true;
 			int v0,v1,v2;
 			iss >> trash;
 			while (iss >> v0 >> trash >> v1 >> trash >> v2) {
-				//while (iss >> tmp[0] >> trash >> tmp[1] >> trash >> tmp[2]) {
-				// in wavefront obj all indices start at 1, not zero
-				//for (int i = 0; i < 3; i++) tmp[i]--; 
 				--v0; --v1; --v2;
-				//f.push_back(tmp);
+				mesh->indices.push_back(v0);
+				if (v1 != v0) bSortUVs = true;
+				uvIndices.push_back(v1);
+
+				if (!bGenerateNormals)
+				{
+					if (v2 != v0) bSortNormals = true;
+					normalIndices.push_back(v2);
+				}
 			}
-			mesh->indices.push_back(v0);
-			mesh->indices.push_back(v1);
-			mesh->indices.push_back(v2);
 		}
 	}
+	if (!(hasVertices && hasIndices))
+	{
+		XLogWarning("Invalid obj fmt: %s.\n", fileName.c_str());
+		return nullptr;
+	}
+
+	if (bGenerateNormals) bSortNormals = false;
+	
+	// obj文件不同顶点属性可能会有不同的索引值，而IBO只能放一个类型的索引。以最大的一个属性的索引为准，重新调整其他属性的数据顺序
+	if (bSortUVs || bSortNormals)
+	{
+		int maxsize = 0;
+		int maxi = -1;
+		int ss[] = {
+			mesh->vertices.size(), 
+			bSortUVs ? mesh->uvs.size() : 0,
+			bSortNormals ? mesh->normals.size() : 0
+		};
+		std::vector<UInt32>* ptrs[] = { &mesh->indices, &uvIndices, &normalIndices };
+		for (int i = 0, n = sizeof(ss) / sizeof(int); i < n; ++i)
+		{
+			if (ss[i] > maxsize)
+			{
+				maxsize = ss[i];
+				maxi = i;
+			}
+		}
+		if (maxi < 0)
+		{
+			XLogError("Unknown Error while loading mesh: %s.\n", fileName.c_str());
+			return nullptr;
+		}
+
+		int mask = 7 & ~(1 << maxi);
+		bool bSortPos = mask & 1;
+		bSortUVs = bSortUVs && (mask & 2);
+		bSortNormals = bSortNormals && (mask & 4);
+		std::vector<UInt32>& ref = *ptrs[maxi];
+		std::vector<Vec3> verRemap;
+		std::vector<Vec2> uvRemap;
+		std::vector<Vec3> nRemap;
+		if (bSortPos && maxsize > 0) verRemap.resize(maxsize, Vec3(0));
+		if (bSortUVs && maxsize > 0) uvRemap.resize(maxsize, Vec2(0));
+		if (bSortNormals && maxsize > 0) nRemap.resize(maxsize, Vec3(0));
+		for (int i = 0, n = ref.size(); i < n; ++i)
+		{
+			if (bSortPos) verRemap[ref[i]] = mesh->vertices[mesh->indices[i]];
+			if (bSortUVs) uvRemap[ref[i]] = mesh->uvs[uvIndices[i]];
+			if (bSortNormals) nRemap[ref[i]] = mesh->normals[normalIndices[i]];
+		}
+		if (bSortPos) mesh->vertices.swap(verRemap);
+		if (bSortUVs) mesh->uvs.swap(uvRemap);
+		if (bSortNormals) mesh->normals.swap(nRemap);
+		mesh->indices.swap(ref);
+	}
+	
 	XLogInfo("Load mesh successfully: %s, v# %d, f# %d, vt# %d, vn# %d\n", fileName.c_str(), mesh->vertices.size(), mesh->indices.size(), mesh->uvs.size(), mesh->normals.size());
 	return mesh;
 }

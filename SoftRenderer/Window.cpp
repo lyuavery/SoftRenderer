@@ -166,9 +166,9 @@ int SR::Window::Init(int w, int h, bool topDown)
 	ReleaseDC(wndHandle, hDC);
 	wndDC = compatibleHDC;
 
-	frameBuffer = std::unique_ptr<FrameBuffer>();
+	frameBuffer.reset(new FrameBuffer);
 	frameBuffer->colorBuf = std::make_unique<SR::FrameBufferAttachment>(SR::FrameBufferAttachmentFormat::BGRA32, w, h, nullptr);
-	frameBuffer->depthBuf = std::make_unique<SR::FrameBufferAttachment>(SR::FrameBufferAttachmentFormat::Depth32, w, h, nullptr);
+	frameBuffer->depthBuf = std::make_unique<SR::FrameBufferAttachment>(SR::FrameBufferAttachmentFormat::Depth32, w, h);
 	int bpp = frameBuffer->colorBuf->GetBytesPerPixel();
 	BITMAPINFO bi = {
 		{
@@ -214,7 +214,6 @@ int SR::Window::Init(int w, int h, bool topDown)
 	
 	memset(screenBuf, 0, w * h * bpp);
 	frameBuffer->colorBuf->Assign(screenBuf);
-	frameBuffer->depthBuf->Assign(new Byte[w * h]);
 	bInit = true;
 	return 0;
 }

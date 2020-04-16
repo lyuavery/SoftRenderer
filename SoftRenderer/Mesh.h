@@ -28,24 +28,24 @@ namespace SR
 		std::vector<Color> colors;
 		std::vector<UInt32> indices;
 		Mesh() = default;
-		Mesh(const Mesh& m, int vertexAttribute = (int)VertexAttribute::Positions) {
-			attrib = vertexAttribute;
-			if ((vertexAttribute & (int)VertexAttribute::Positions) != 0)
+		Mesh(const Mesh& m, int vertexAttribute) {
+			attrib = vertexAttribute == -1 ? m.attrib : vertexAttribute;
+			if ((attrib & (int)VertexAttribute::Positions) != 0)
 			{
 				this->vertices = m.vertices;
 				this->indices = m.indices;
 			}
-			if ((vertexAttribute & (int)VertexAttribute::UVs) != 0)
+			if ((attrib & (int)VertexAttribute::UVs) != 0)
 				this->uvs = m.uvs;
-			if ((vertexAttribute & (int)VertexAttribute::Tangents) != 0)
+			if ((attrib & (int)VertexAttribute::Tangents) != 0)
 				this->tangents = m.tangents;
-			if ((vertexAttribute & (int)VertexAttribute::Normals) != 0)
+			if ((attrib & (int)VertexAttribute::Normals) != 0)
 				this->normals = m.normals;
-			if ((vertexAttribute & (int)VertexAttribute::Colors) != 0)
+			if ((attrib & (int)VertexAttribute::Colors) != 0)
 				this->colors = m.colors;
 		}
 
-		inline int Attribute(VertexAttribute a) {
+		inline bool IsValidAttribute(VertexAttribute a) {
 			bool b = false;
 			switch (a)
 			{
@@ -75,17 +75,18 @@ namespace SR
 				break;
 			}
 			}
-			return (attrib & (int)a) && b;
+			return (attrib & (int)a) && !b;
 		}
+
 		inline void EnableAttribute(bool b, VertexAttribute a)
 		{
 			if (b)
 			{
-				attrib &= (int)a;
+				attrib |= int(a);
 			}
 			else
 			{
-				attrib &= ~(int)a;
+				attrib &= ~int(a);
 			}
 		}
 

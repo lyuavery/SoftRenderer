@@ -26,6 +26,7 @@ namespace sbm
 	} \
 	void Normalize() { \
 		T mag = Magnitude(); \
+		if(mag == 0) return; \
 		for (size_t i = 0; i < N; ++i) { \
 				(&x)[i] /= mag; \
 		} \
@@ -33,7 +34,7 @@ namespace sbm
 	Vec<T, N> Normalized() const { \
 		Vec<T, N> v; \
 		T mag = Magnitude(); \
-		if(mag == T(0)) return Vec<T, N>(0); \
+		if(mag == 0) return Vec<T, N>(0); \
 		for (size_t i = 0; i < N; ++i) { \
 				(&v.x)[i] = (&x)[i] / mag; \
 		} \

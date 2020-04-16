@@ -3,7 +3,6 @@
 #include <string>
 #include <memory>
 
-#include "Header.h"
 #include "Math/Vector.h"
 #include "Math/Matrix.h"
 #include "Math/Matrix4x4.h"
@@ -19,120 +18,11 @@
 #include "Log.h"
 #include "Camera.h"
 #include "Window.h"
-
-
-static int screen_keys[512];	// 当前键盘按下状态
-//#ifdef _MSC_VER
-//#pragma comment(lib, "gdi32.lib")
-//#pragma comment(lib, "user32.lib")
-//#endif
-
-// 先考虑单线程
-// 首要目标是将教程的东西实时显示，允许截图（保存到tga）
-// 然后实现裁剪,scanline,top-left和模式切换
-// 到这一步就是一个完整的东西了
-// WindowMgr
-		// FrameBuffer
-// ResLoader
-// Time
-
-// 管线化
-// 先考虑最基础组件，而且按自己的理解来设计
-
-// Actor
-	// Transform
-	// Renderer
-// App
-	// InputMgr
-	// SceneMgr
-		// Actor
-			// Transform
-			// Renderer
-				// MeshRenderer
-				// SkinnedMeshRenderer
-			// Mesh
-			// MeshFilter
-			// Material
-				// Shader
-			// Texture
-	// RendererMgr
-		// Vertex
-		// Rasterize
-		// Pixel
-	// WindowMgr
-		// FrameBuffer
-// ResLoader
-// Time
-// Profiler
-// Log
-// Math
-
-namespace SR
-{
-	class Logger
-	{
-		static const int DEFAULT_RESERVE = 512;
-	private:
-	public:
-		void LogInfo(char* fmt, ...)
-		{
-			auto fd = stdout;
-			const char* tag = "INFO";
-
-			std::string extFmt("[");
-			extFmt.reserve(DEFAULT_RESERVE);
-			extFmt = extFmt + tag + "] " + __FILE__ + ": Line " + std::to_string(__LINE__) + ":\n" + fmt;
-			va_list args;
-			va_start(args, fmt);
-			vfprintf(fd, extFmt.c_str(), args);
-			va_end(args);
-		}
-
-		void LogWarning(char* fmt, ...)
-		{
-			auto fd = stdout;
-			const char* tag = "WARNING";
-
-			std::string extFmt("[");
-			extFmt.reserve(DEFAULT_RESERVE);
-			extFmt = extFmt + tag + "] " + __FILE__ + ": Line " + std::to_string(__LINE__) + ":\n" + fmt;
-			va_list args;
-			va_start(args, fmt);
-			vfprintf(fd, extFmt.c_str(), args);
-			va_end(args);
-		}
-
-		void LogError(char* fmt, ...)
-		{
-			auto fd = stderr;
-			const char* tag = "ERROR";
-
-			std::string extFmt("[");
-			extFmt.reserve(DEFAULT_RESERVE);
-			extFmt = extFmt + tag + "] " + __FILE__ + ": Line " + std::to_string(__LINE__) + ":\n" + fmt;
-			va_list args;
-			va_start(args, fmt);
-			vfprintf(fd, extFmt.c_str(), args);
-			va_end(args);
-		}
-	};
-
-	/*class RenderTarget
-	{
-	public:
-		static std::shared_ptr<RenderTarget> active;
-		std::unique_ptr<FrameBuffer> frameBuffer;
-	};
-	std::shared_ptr<RenderTarget> RenderTarget::active;
-*/
-}
-
+#include "Renderer.h"
+#include "Header.h"
 
 static int gWidth = 800;
 static int gHeight = 600;
-
-
-
 
 Mat4 GetViewportMatrix(int x, int y, int width, int height)
 {
@@ -159,69 +49,6 @@ Mat4 GetLookAtMatrix(const Vec3& eye, const Vec3& center, const Vec3& up)
 	return view;
 }
 
-//
-//class MathSymbol {
-//	std::string str;
-//public:
-//	MathSymbol() { str = ""; }
-//	MathSymbol(const MathSymbol& v) { str = v.str; }
-//	MathSymbol(const char* v) :str(v) { }
-//	MathSymbol(const std::string& v) :str(v) { }
-//	MathSymbol(const float v):str("("+std::to_string(v)+")") { }
-//	MathSymbol operator+(const MathSymbol& symbol) {
-//		if (symbol.str == "0" && str == "0")  return MathSymbol("0");
-//		if (symbol.str == "0") return *this;
-//		if (str == "0") return symbol;
-//		return MathSymbol(str+ "+" + symbol.str);
-//	}
-//	MathSymbol operator*(const MathSymbol& symbol) {
-//		if (symbol.str == "0" || str == "0") return MathSymbol("0");
-//		if (symbol.str == "1" && str == "1")  return MathSymbol("1");
-//		if (symbol.str == "1") return *this;
-//		if (str == "1") return symbol;
-//		return MathSymbol(str + "*" + symbol.str);
-//	}
-//	MathSymbol& operator=(const MathSymbol& symbol) {
-//		str = symbol.str;
-//		return *this;
-//	}
-//	friend std::ostream& operator<<(std::ostream& out, const MathSymbol& ms);
-//};
-//std::ostream& operator<<(std::ostream& out, const MathSymbol& ms)
-//{
-//	out << ms.str;
-//	return out;
-//}
-//MathSymbol rxarr[] = {
-//		"1","0","0","0",
-//		"0","cosx","-sinx","0",
-//		"0","sinx","cosx","0",
-//		"0","0","0","1",
-//};
-//TestMat rx(rxarr);
-//
-//MathSymbol ryarr[] = {
-//	"cosy","0","siny","0",
-//	"0","1","0","0",
-//	"-siny","0","cosy","0",
-//	"0","0","0","1",
-//};
-//TestMat ry(ryarr);
-//
-//MathSymbol rzarr[] = {
-//	"cosz","-sinz","0","0",
-//	"sinz","cosz","0","0",
-//	"0","0","1","0",
-//	"0","0","0","1",
-//};
-//TestMat rz(rzarr);
-////TestMat ret = ry * rx * rz;
-//TestMat ret = rz * ry * rx;
-//std::cout << ret;
-//getchar();
-//return 0;
-//typedef sbm::Matrix<4, 4, MathSymbol> TestMat;
-
 void TestDraw(SR::Texture& image, SR::Texture& zBuf,
 	Vec3 v0, Vec3 v1, Vec3 v2,
 	Vec2 uv0, Vec2 uv1, Vec2 uv2,
@@ -239,58 +66,50 @@ Mat4 gViewportMat;
 Mat4 gViewMat;
 Mat4 gProjMat;
 Vec3 gCameraPos;
+
+void Test();
 int main()
 {
-	std::cout << sizeof(Mat4::size()) << std::endl;
-	std::cout << sizeof(Vec4::size()) << std::endl;
-	std::cout << sizeof(sbm::Matrix<2,3>::size()) << std::endl;
-	getchar();
-	return 0;
+	// Camera
 	SR::Camera::mainCamera = std::unique_ptr<SR::Camera>(new SR::Camera(Vec3(0,0,3), Vec3(0)));
 	auto& mainCam = *SR::Camera::mainCamera;
-	mainCam.viewport = SR::Viewport(0, 0, gWidth, gHeight, true);
-
+	mainCam.viewport = SR::Viewport::main;
 	mainCam.RegisterInputListener();
-	
+
 	gViewportMat = mainCam.ViewportTransform();
 	gCameraPos = mainCam.position;
 
-	int w = gWidth, h = gHeight;
-
+	// Window
 	auto& wnd = SR::Window::GetInstance();
-	wnd.Init(w, h, true);
+	wnd.Init(SR::Viewport::main.width, SR::Viewport::main.height, SR::Viewport::main.bTopDown);
 	auto& backBuf = wnd.GetBackBuffer();
 	if (backBuf)
 	{
 		if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
 		if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f,0.f,0.f);
 	}
-	//SR::RenderTarget::active = backBuf;
-	//memset(screen_keys, 0, sizeof(int) * 512);
-	/*foreach pluginMgr.plugins.Init();
-	while (!window->IsExit()) {
-		inputsystem->Update();
-		render
-	}*/
 
-	//std::unique_ptr<SR::Mesh> floor(SR::MeshLoader::GetInstance().Load("Resources/floor/floor.obj"));
-	float fltMax = sbm::Math::FloatMax;
+	// Resources
+	std::shared_ptr<SR::Mesh> tri(SR::MeshLoader::GetInstance().Load("Resources/tri.obj"));
 	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
-	SR::TGALoader tgaLoader;
-	std::shared_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	std::shared_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	std::shared_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	//SR::TGALoader tgaLoader;
+	//std::shared_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	//std::shared_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	//std::shared_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
 
-	/*for (int j = 0, w = backBuf->colorBuf.GetWidth(), h = backBuf->colorBuf.GetHeight(); j < h; ++j)
-	{
-		for (int i = 0; i < w; ++i)
-		{
-			backBuf->colorBuf.Set(i, j, africanHeadSpec->Get(i, j));
-		}
-	}
-*/
+	// Init Render Tasks
+	SR::CommonVert vert;
+	SR::CommonFrag frag;
+	SR::RenderTask task;
+	task.frameBuffer = backBuf;
+	task.Bind(&vert);
+	task.Bind(&frag);
+	task.Bind(tri.get());
+
+	// Time
 	SR::Time::Init();
 	float lastPrintTime = SR::Time::TimeSinceStartup();
+
 	while (!wnd.ShouldExit()) {
 		SR::Time::Update();		
 		float deltaTime = SR::Time::DeltaTime();
@@ -299,69 +118,72 @@ int main()
 		gViewMat = mainCam.ViewMatrix();
 		gProjMat = mainCam.ProjectionMatrix();
 
-		if (SR::Input::GetKeyDown(SR::KeyCode::Z))
-		{
-			mainCam.Orbit(45, 45);
-		}
-
 		if (backBuf)
 		{
 			if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
 			if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f, 0.f, 0.f);
 		}
-		//TestDraw(backBuf->colorBuf, backBuf->depthBuf,
-		//	//Vec3(-.5f, -.5f, .5f), Vec3(.5f, -.5f, -.5f), Vec3(0, .5f, 0),
-		//	//Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
-		//	//Vec3(1, 0, 1), Vec3(1, 0, 1), Vec3(1, 0, 1),
-		//	Vec3(-.5f, -.5f, .0f), Vec3(.5f, -.5f, .0f), Vec3(-.5f, .5f, 0),
-		//	Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
-		//	Vec3(0, 0, 1), Vec3(0, 0, 1), Vec3(0, 0, 1),
-		//	SR::Color::white
-		//	);
-		{
-			auto& f = africanHead->indices;
-			//for (auto f : africanHead->faces)
-			for (int i = 0, n = africanHead->indices.size(); i < n; i += 3)
-			{
-				/*auto v0 = africanHead->vertices[f[0][0]];
-				auto v1 = africanHead->vertices[f[1][0]];
-				auto v2 = africanHead->vertices[f[2][0]];
-
-				auto uv0 = africanHead->uv[f[0][1]];
-				auto uv1 = africanHead->uv[f[1][1]];
-				auto uv2 = africanHead->uv[f[2][1]];
-
-				auto n0 = africanHead->normals[f[0][2]];
-				auto n1 = africanHead->normals[f[1][2]];
-				auto n2 = africanHead->normals[f[2][2]];*/
-				auto v0 = africanHead->vertices[f[i + 0]];
-				auto v1 = africanHead->vertices[f[i + 1]];
-				auto v2 = africanHead->vertices[f[i + 2]];
-
-				auto uv0 = africanHead->uvs[f[i + 1]];
-				auto uv1 = africanHead->uvs[f[i + 1]];
-				auto uv2 = africanHead->uvs[f[i + 1]];
-
-				auto n0 = africanHead->normals[f[i + 2]];
-				auto n1 = africanHead->normals[f[i + 2]];
-				auto n2 = africanHead->normals[f[i + 2]];
-				DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(*(backBuf->colorBuf), *africanHeadDiffuse, *africanHeadNormal, *africanHeadSpec, *(backBuf->depthBuf), v0, v1, v2, uv0, uv1, uv2, n0, n1, n2);
-			}
-		}
 		
+		task.Submit();
+		SR::Renderer::GetInstance().RenderAll();
+
 		wnd.Update(deltaTime);
 		float now = SR::Time::TimeSinceStartup();
+		float fps = SR::Time::FPS();
 		if ((now - lastPrintTime) > 1)
 		{
-			std::cout << "FPS:" << SR::Time::FPS() << std::endl;
+			std::cout << "FPS:" << fps << std::endl;
 			lastPrintTime = now;
 		}
 		wnd.Dispatch();
-		//Sleep(1);
 	}
 	wnd.Destroy();
 
 	return 0;
+}
+
+void Test()
+{
+	//TestDraw(*backBuf->colorBuf, *backBuf->depthBuf,
+	//	//Vec3(-.5f, -.5f, .5f), Vec3(.5f, -.5f, -.5f), Vec3(0, .5f, 0),
+	//	//Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
+	//	//Vec3(1, 0, 1), Vec3(1, 0, 1), Vec3(1, 0, 1),
+	//	Vec3(-.5f, -.5f, .0f), Vec3(.5f, -.5f, .0f), Vec3(-.5f, .5f, 0),
+	//	Vec2(0, 0), Vec2(1, 0), Vec2(.5, 1),
+	//	Vec3(0, 0, 1), Vec3(0, 0, 1), Vec3(0, 0, 1),
+	//	SR::Color::white
+	//);
+	//{
+	//	auto& f = africanHead->indices;
+	//	//for (auto f : africanHead->faces)
+	//	for (int i = 0, n = africanHead->indices.size(); i < n; i += 3)
+	//	{
+	//		/*auto v0 = africanHead->vertices[f[0][0]];
+	//		auto v1 = africanHead->vertices[f[1][0]];
+	//		auto v2 = africanHead->vertices[f[2][0]];
+
+	//		auto uv0 = africanHead->uv[f[0][1]];
+	//		auto uv1 = africanHead->uv[f[1][1]];
+	//		auto uv2 = africanHead->uv[f[2][1]];
+
+	//		auto n0 = africanHead->normals[f[0][2]];
+	//		auto n1 = africanHead->normals[f[1][2]];
+	//		auto n2 = africanHead->normals[f[2][2]];*/
+	//		auto id0 = f[i + 0], id1 = f[i + 1], id2 = f[i + 2];
+	//		auto v0 = africanHead->vertices[id0];
+	//		auto v1 = africanHead->vertices[id1];
+	//		auto v2 = africanHead->vertices[id2];
+	//		
+	//		auto uv0 = africanHead->uvs[id0];
+	//		auto uv1 = africanHead->uvs[id1];
+	//		auto uv2 = africanHead->uvs[id2];
+
+	//		auto n0 = africanHead->normals[id0];
+	//		auto n1 = africanHead->normals[id1];
+	//		auto n2 = africanHead->normals[id2];
+	//		DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(*(backBuf->colorBuf), *africanHeadDiffuse, *africanHeadNormal, *africanHeadSpec, *(backBuf->depthBuf), v0, v1, v2, uv0, uv1, uv2, n0, n1, n2);
+	//	}
+	//}
 }
 
 void DrawFilledTrianxgleBarycentricCoordinate_Texture_TestPerspectiveCorrection(SR::Texture& image, SR::Texture& tex, SR::Texture& normalMap, SR::Texture& specMap, SR::Texture& zBuf,

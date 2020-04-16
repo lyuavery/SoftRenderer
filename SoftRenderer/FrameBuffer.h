@@ -70,7 +70,7 @@ namespace SR
 		//	if (colorBuf) colorBuf->Clear(c);
 		//	if (depthBuf) depthBuf->Clear(d);
 		//}
-		FrameBuffer() = delete;
+		//FrameBuffer() = delete;
 	};
 	
 }
