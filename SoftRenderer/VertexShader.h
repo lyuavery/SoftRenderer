@@ -19,14 +19,4 @@ namespace SR
 		virtual VertexShader* Clone(bool bCopy = false) const override { return new T; }
 	};
 
-	class CommonVert : public IVertexShader<CommonVert>
-	{
-	public:
-		virtual VertexShaderOutput operator()(VertexShaderInput& in, const std::shared_ptr<Varying>& v, const std::shared_ptr<const Uniform>& u) const override
-		{
-			VertexShaderOutput out;
-			out.gl_Position = Vec4(0, 0, 0, 1);
-			return out;
-		}
-	};
 }

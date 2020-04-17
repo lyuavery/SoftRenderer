@@ -47,13 +47,13 @@ namespace sbm
 		inline T& operator[](int i);
 		inline const T& operator[](int i) const;
 
-		inline Matrix operator*(const T& v);
+		inline Matrix operator*(const T& v) const;
 		Matrix& operator*=(const T& v);
 		template<size_t NR, size_t NC, typename T> friend Matrix operator*(const T& v, const Matrix<NR, NC, T>& m);
-		sbm::Vec<T, NR> operator*(const sbm::Vec<T, NC>& v);
+		sbm::Vec<T, NR> operator*(const sbm::Vec<T, NC>& v) const;
 		template<size_t NR, size_t NC, typename T> friend sbm::Vec<T, 4> operator*(const sbm::Vec<T, NR>& v, const Matrix<NR, NC, T>& m);
 
-		template<size_t NX> Matrix<NR, NX, T> operator*(const Matrix<NC, NX, T>& m);
+		template<size_t NX> Matrix<NR, NX, T> operator*(const Matrix<NC, NX, T>& m) const;
 
 		
 
@@ -168,7 +168,7 @@ namespace sbm
 	}
 
 	template<size_t NR, size_t NC, typename T>
-	sbm::Vec<T, NR> Matrix<NR, NC, T>::operator*(const sbm::Vec<T, NC>& v)
+	sbm::Vec<T, NR> Matrix<NR, NC, T>::operator*(const sbm::Vec<T, NC>& v) const
 	{
 		sbm::Vec<T, NR> temp;
 		for (int r = 0; r < NR; ++r)
@@ -184,7 +184,7 @@ namespace sbm
 	}
 
 	template<size_t NR, size_t NC, typename T>
-	Matrix<NR, NC, T> Matrix<NR, NC, T>::operator*(const T& v)
+	Matrix<NR, NC, T> Matrix<NR, NC, T>::operator*(const T& v) const
 	{
 		Matrix<NR, NC, T> temp(*this);
 		return temp *= v;
@@ -207,7 +207,7 @@ namespace sbm
 
 	template<size_t NR, size_t NC, typename T>
 	template<size_t NX>
-	Matrix<NR, NX, T> Matrix<NR, NC, T>::operator*(const Matrix<NC, NX, T>& m)
+	Matrix<NR, NX, T> Matrix<NR, NC, T>::operator*(const Matrix<NC, NX, T>& m) const
 	{
 		Matrix<NR, NX, T> temp;
 		for (int x = 0; x < NX; ++x)

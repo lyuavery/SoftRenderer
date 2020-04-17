@@ -22,12 +22,12 @@ void SR::Renderer::VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool 
 	{
 		// If cached, skip this vertex
 		int idx = indices[i];
-		std::shared_ptr<VertexShaderOutput> out;
+		VertexShaderOutput out;
 		if (cacheEnabled)
 		{
 			if (cache->Get(idx, out))
 			{
-				vsOutputs.push(out);
+				vsOutputs.push(std::make_shared<VertexShaderOutput>(out));
 				continue;
 			}
 		}
@@ -38,10 +38,11 @@ void SR::Renderer::VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool 
 		if (mesh->IsValidAttribute(VertexAttribute::Normals)) in.normal = mesh->normals[idx];
 		if (mesh->IsValidAttribute(VertexAttribute::Tangents)) in.tangent = mesh->tangents[idx];
 		if (mesh->IsValidAttribute(VertexAttribute::Colors)) in.color = mesh->colors[idx];
-		out = std::make_shared<VertexShaderOutput>(vsDispatcher->Dispatch(i, idx, in));
-		vsOutputs.push(out);
+		out = vsDispatcher->Dispatch(i, idx, in);
+		vsOutputs.push(std::make_shared<VertexShaderOutput>(out));
 		if (cacheEnabled) cache->Cache(idx, out);
 	}
+	if (cacheEnabled) cache->Clear();
 }
 
 // 前一个drawcall的图元的处理一定先于后一个drawcall的所有图元 https://www.khronos.org/opengl/wiki/Primitive_Assembly
@@ -103,6 +104,7 @@ void SR::Renderer::VertexPostProcessing(const Viewport& viewport)
 
 
 			viewport.ApplyViewportTransform(v->gl_Position);
+			int x = 1;
 		}
 		paOutputs.push(primitve);
 	}
@@ -127,8 +129,8 @@ void SR::Renderer::Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, Inte
 		float fltMax = sbm::Math::FloatMax;
 		Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(viewport.width, viewport.height);
 		for (int i = 0; i < 2; ++i) { // 取ceil保证浮点转整型时样本点在三角形内
-			bboxMax[i] = sbm::ceil(sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] }))) - 1;
-			bboxMin[i] = sbm::ceil(sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
+			bboxMax[i] = (sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] })));
+			bboxMin[i] = (sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
 		}
 
 		bool hasCustomedVarying = bool(v0.varying);
@@ -155,12 +157,12 @@ void SR::Renderer::Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, Inte
 				}
 				else
 				{
-					w = lambda3.x * wv.x + lambda3.x * wv.y + lambda3.x * wv.z;
+					w = lambda3.x * wv.x + lambda3.y * wv.y + lambda3.z * wv.z;
 				}
+
 				out->gl_FragCoord = Vec4(
-					lambda3.x * p0.x + lambda3.x * p1.x + lambda3.x * p2.x,
-					lambda3.x * p0.y + lambda3.x * p1.y + lambda3.x * p2.y,
-					lambda3.x * zv.x + lambda3.x * zv.y + lambda3.x * zv.z,
+					j, i,
+					lambda3.x * zv.x + lambda3.y * zv.y + lambda3.z * zv.z,
 					w
 				);
 				out->gl_FragDepth = out->gl_FragCoord.z;
@@ -172,7 +174,7 @@ void SR::Renderer::Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, Inte
 					int i = 0;
 					while (i < size)
 					{
-						(*out->varying)[i] = lambda3.x * (*v0.varying)[i] + lambda3.x * (*v1.varying)[i] + lambda3.x * (*v2.varying)[i],
+						(*out->varying)[i] = lambda3.x * (*v0.varying)[i] + lambda3.y * (*v1.varying)[i] + lambda3.z * (*v2.varying)[i],
 							++i;
 					}
 				}
@@ -266,7 +268,8 @@ void SR::Renderer::RenderAll()
 		Shading();
 
 		// Per Fragment Ops: Depth Test
-		DepthTesting(state.depthFunc, task.frameBuffer, fsOutputs);
+		if (!state.bEarlyDepthTest)
+			DepthTesting(state.depthFunc, task.frameBuffer, fsOutputs);
 
 		// Per Fragment Ops: Blend
 		Blending(state.srcOp, state.dstOp, task.frameBuffer);

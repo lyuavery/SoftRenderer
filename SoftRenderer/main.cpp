@@ -19,6 +19,7 @@
 #include "Camera.h"
 #include "Window.h"
 #include "Renderer.h"
+#include "CommonShader.h"
 #include "Header.h"
 
 static int gWidth = 800;
@@ -71,13 +72,21 @@ void Test();
 int main()
 {
 	// Camera
-	SR::Camera::mainCamera = std::unique_ptr<SR::Camera>(new SR::Camera(Vec3(0,0,3), Vec3(0)));
 	auto& mainCam = *SR::Camera::mainCamera;
 	mainCam.viewport = SR::Viewport::main;
 	mainCam.RegisterInputListener();
 
 	gViewportMat = mainCam.ViewportTransform();
 	gCameraPos = mainCam.position;
+
+	// Resources
+	std::shared_ptr<SR::Mesh> tri(SR::MeshLoader::GetInstance().Load("Resources/tri.obj"));
+	std::shared_ptr<SR::Mesh> box(SR::MeshLoader::GetInstance().Load("Resources/box.obj"));
+	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
+	//SR::TGALoader tgaLoader;
+	//std::shared_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	//std::shared_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	//std::shared_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
 
 	// Window
 	auto& wnd = SR::Window::GetInstance();
@@ -88,24 +97,18 @@ int main()
 		if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
 		if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f,0.f,0.f);
 	}
-
-	// Resources
-	std::shared_ptr<SR::Mesh> tri(SR::MeshLoader::GetInstance().Load("Resources/tri.obj"));
-	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
-	//SR::TGALoader tgaLoader;
-	//std::shared_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	//std::shared_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	//std::shared_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
-
+	
 	// Init Render Tasks
 	SR::CommonVert vert;
 	SR::CommonFrag frag;
+	SR::CommonVarying varying;
+	SR::CommonUniform uniform;
 	SR::RenderTask task;
 	task.frameBuffer = backBuf;
-	task.Bind(&vert);
+	task.Bind(&vert, &varying);
 	task.Bind(&frag);
-	task.Bind(tri.get());
-
+	task.Bind(africanHead.get());
+	//task.state.depthFunc = SR::DepthFunc::Less;
 	// Time
 	SR::Time::Init();
 	float lastPrintTime = SR::Time::TimeSinceStartup();
@@ -115,15 +118,15 @@ int main()
 		float deltaTime = SR::Time::DeltaTime();
 
 		SR::Input::Update(deltaTime);
-		gViewMat = mainCam.ViewMatrix();
-		gProjMat = mainCam.ProjectionMatrix();
-
+		
 		if (backBuf)
 		{
 			if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
 			if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f, 0.f, 0.f);
 		}
-		
+
+		uniform.mat_ObjectToClip = mainCam.ProjectionMatrix() * mainCam.ViewMatrix();
+		task.Bind(&uniform);
 		task.Submit();
 		SR::Renderer::GetInstance().RenderAll();
 

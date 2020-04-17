@@ -64,13 +64,11 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 
 	SR::Mesh* mesh = new SR::Mesh;
 	std::string line;
-	bool bSortUVs = false;
 	std::vector<UInt32> uvIndices;
-	bool bSortNormals = false;
 	std::vector<UInt32> normalIndices;
 	bool hasVertices = false;
 	bool hasIndices = false;
-
+	bool bRemap = false;
 	while (!in.eof()) {
 		std::getline(in, line);
 		std::istringstream iss(line);
@@ -104,12 +102,10 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 			while (iss >> v0 >> trash >> v1 >> trash >> v2) {
 				--v0; --v1; --v2;
 				mesh->indices.push_back(v0);
-				if (v1 != v0) bSortUVs = true;
+				if (v0 != v1 || v0 != v2 || v1 != v2) bRemap = true;
 				uvIndices.push_back(v1);
-
 				if (!bGenerateNormals)
 				{
-					if (v2 != v0) bSortNormals = true;
 					normalIndices.push_back(v2);
 				}
 			}
@@ -121,17 +117,15 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 		return nullptr;
 	}
 
-	if (bGenerateNormals) bSortNormals = false;
-	
 	// obj文件不同顶点属性可能会有不同的索引值，而IBO只能放一个类型的索引。以最大的一个属性的索引为准，重新调整其他属性的数据顺序
-	if (bSortUVs || bSortNormals)
+	if (bRemap)
 	{
 		int maxsize = 0;
 		int maxi = -1;
 		int ss[] = {
 			mesh->vertices.size(), 
-			bSortUVs ? mesh->uvs.size() : 0,
-			bSortNormals ? mesh->normals.size() : 0
+			mesh->uvs.size(),
+			!bGenerateNormals ? mesh->normals.size() : 0
 		};
 		std::vector<UInt32>* ptrs[] = { &mesh->indices, &uvIndices, &normalIndices };
 		for (int i = 0, n = sizeof(ss) / sizeof(int); i < n; ++i)
@@ -149,25 +143,25 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 		}
 
 		int mask = 7 & ~(1 << maxi);
-		bool bSortPos = mask & 1;
-		bSortUVs = bSortUVs && (mask & 2);
-		bSortNormals = bSortNormals && (mask & 4);
+		bool notPosMain = bool(mask & 1);
+		bool notUVMain = bool(mask & 2);
+		bool notNMain = bool(mask & 4);
 		std::vector<UInt32>& ref = *ptrs[maxi];
 		std::vector<Vec3> verRemap;
 		std::vector<Vec2> uvRemap;
 		std::vector<Vec3> nRemap;
-		if (bSortPos && maxsize > 0) verRemap.resize(maxsize, Vec3(0));
-		if (bSortUVs && maxsize > 0) uvRemap.resize(maxsize, Vec2(0));
-		if (bSortNormals && maxsize > 0) nRemap.resize(maxsize, Vec3(0));
+		if (notPosMain) verRemap.resize(maxsize, Vec3(0));
+		if (notUVMain) uvRemap.resize(maxsize, Vec2(0));
+		if (notNMain) nRemap.resize(maxsize, Vec3(0));
 		for (int i = 0, n = ref.size(); i < n; ++i)
 		{
-			if (bSortPos) verRemap[ref[i]] = mesh->vertices[mesh->indices[i]];
-			if (bSortUVs) uvRemap[ref[i]] = mesh->uvs[uvIndices[i]];
-			if (bSortNormals) nRemap[ref[i]] = mesh->normals[normalIndices[i]];
+			if (notPosMain) verRemap[ref[i]] = mesh->vertices[mesh->indices[i]];
+			if (notUVMain) uvRemap[ref[i]] = mesh->uvs[uvIndices[i]];
+			if (notNMain) nRemap[ref[i]] = mesh->normals[normalIndices[i]];
 		}
-		if (bSortPos) mesh->vertices.swap(verRemap);
-		if (bSortUVs) mesh->uvs.swap(uvRemap);
-		if (bSortNormals) mesh->normals.swap(nRemap);
+		if (notPosMain) mesh->vertices.swap(verRemap);
+		if (notUVMain) mesh->uvs.swap(uvRemap);
+		if (notNMain) mesh->normals.swap(nRemap);
 		mesh->indices.swap(ref);
 	}
 	

@@ -55,13 +55,13 @@ namespace sbm
 		Matrix GetInversed();
 		inline Matrix GetTransposed();
 
-		inline Matrix operator*(const T& scale);
-		inline Matrix operator*(const Matrix& m4);
+		inline Matrix operator*(const T& scale) const;
+		inline Matrix operator*(const Matrix& m4) const;
 		template<typename T> friend Matrix operator*(const T& scale, const Matrix<4,4,T>& m4);
 		Matrix& operator*=(const Matrix& m4);
 		inline Matrix& operator*=(const T& scale);
-		sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4);
-		template<size_t NX> Matrix<4, NX, T> operator*(const Matrix<4, NX, T>& m4);
+		sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4) const;
+		template<size_t NX> Matrix<4, NX, T> operator*(const Matrix<4, NX, T>& m4) const;
 		template<typename T> friend std::ostream& operator<<(std::ostream& out, const Matrix<4, 4, T>& m4);
 		template<typename T> friend sbm::Vec<T, 4> operator*(const sbm::Vec<T, 4>& v4, const Matrix<4, 4, T>& m4);
 
@@ -144,7 +144,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	sbm::Vec<T, 4> Matrix<4, 4, T>::operator*(const sbm::Vec<T, 4>& v4)
+	sbm::Vec<T, 4> Matrix<4, 4, T>::operator*(const sbm::Vec<T, 4>& v4) const
 	{
 		return sbm::Vec<T, 4>(
 			_M(0, 0) * v4[0] + _M(0, 1) * v4[1] + _M(0, 2) * v4[2] + _M(0, 3) * v4[3],
@@ -155,7 +155,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	Matrix<4, 4, T> Matrix<4, 4, T>::operator*(const T& scale)
+	Matrix<4, 4, T> Matrix<4, 4, T>::operator*(const T& scale) const
 	{
 		Matrix<4, 4, T> temp(*this);
 		return temp *= scale;
@@ -169,7 +169,7 @@ namespace sbm
 	}
 
 	template<typename T>
-	Matrix<4, 4, T> Matrix<4, 4, T>::operator*(const Matrix& m4)
+	Matrix<4, 4, T> Matrix<4, 4, T>::operator*(const Matrix& m4) const
 	{
 		Matrix<4, 4, T> temp(*this);
 		return temp *= m4;
@@ -425,7 +425,7 @@ namespace sbm
 
 	template<typename T>
 	template<size_t NX>
-	Matrix<4, NX, T> Matrix<4, 4, T>::operator*(const Matrix<4, NX, T>& m4x)
+	Matrix<4, NX, T> Matrix<4, 4, T>::operator*(const Matrix<4, NX, T>& m4x) const
 	{
 		Matrix<4, NX, T> temp;
 		for (int x = 0; x < NX; ++x)

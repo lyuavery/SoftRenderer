@@ -17,7 +17,6 @@
 #include <unordered_map>
 #include <memory>
 
-
 namespace SR
 {
 	// class Rasterizer
@@ -28,7 +27,7 @@ namespace SR
 	class PostTransformCache
 	{
 		friend class Renderer;
-		std::unordered_map<int, std::shared_ptr<VertexShaderOutput>> data;
+		std::unordered_map<int, VertexShaderOutput> data;
 		std::queue<int> fifo;
 		int max;
 		int cursize;
@@ -42,24 +41,37 @@ namespace SR
 			return true;
 		}
 
-		inline bool Get(int vid, std::shared_ptr<VertexShaderOutput>& out) // 这里要lock data
+		inline bool Get(int vid, VertexShaderOutput& out) // 这里要lock data
 		{
 			if (data.find(vid) == data.end()) return false;
 			out = data[vid];
 			return true;
 		}
 
-		void Cache(int vid, std::shared_ptr<VertexShaderOutput>& in)
+		void Cache(int vid, const VertexShaderOutput& in)
 		{
 			if (data.find(vid) != data.end()) return;
-			if (cursize >= max) {
+			if (cursize == max) {
+				cursize = max;
 				auto i = fifo.front();
 				if (i == vid) return;
 				fifo.pop();
 				data.erase(i);
 			}
+			else
+			{
+				++cursize;
+			}
 			fifo.push(vid);
 			data[vid] = in;
+		}
+	
+		void Clear()
+		{
+			cursize = 0;
+			data.clear();
+			std::queue<int> tmp;
+			fifo.swap(tmp);
 		}
 	};
 
@@ -93,9 +105,10 @@ namespace SR
 		FragmentShaderOutput Dispatch(FragmentShaderInput& input) // TODO：做多线程分发的
 		{
 			FragmentShaderOutput output;
-			std::shared_ptr<const Varying> varying = std::const_pointer_cast<const Varying>(input.varying);
+			auto varying = std::const_pointer_cast<const Varying>(input.varying);
 			input.varying.reset();
 			output.gl_FragCoord = input.gl_FragCoord;
+			output.gl_FragDepth = input.gl_FragDepth;
 			output.color = (*shader)(input, varying, uniform);
 			if (!bEarlyDepthTest) output.gl_FragDepth = input.gl_FragDepth;
 			return output;
@@ -106,13 +119,13 @@ namespace SR
 	{
 		friend class Renderer;
 		std::shared_ptr<SR::Mesh> mesh;
-		std::shared_ptr<Uniform> uniform;
 		std::shared_ptr<Varying> varying;
 		std::shared_ptr<VertexShader> vert;
 		std::shared_ptr<FragmentShader> frag;
 		std::shared_ptr<SR::Viewport> viewport;
 	public:
 		RenderState state;
+		std::shared_ptr<Uniform> uniform;
 		std::shared_ptr<FrameBuffer> frameBuffer;
 		void Viewport(const SR::Viewport* const v)
 		{
@@ -121,7 +134,7 @@ namespace SR
 
 		void Bind(const Uniform* const u)
 		{
-			if(u) uniform.reset(u->Clone());
+			if(u) uniform.reset(u->Clone(true));
 		}
 
 		void Bind(const VertexShader* const vs, const Varying* const v = nullptr)

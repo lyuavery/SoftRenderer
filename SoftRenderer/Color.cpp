@@ -3,12 +3,20 @@
 const SR::Color SR::Color::black = Color(0.f, 0.f, 0.f, 1.0f), 
 SR::Color::white = Color(1.0f),
 SR::Color::grey = Color(.5f,.5f,.5f,1),
-SR::Color::zero = Color(.0f);
+SR::Color::zero = Color(.0f),
+SR::Color::red = Color(1,0,0,1), 
+SR::Color::green = Color(0, 1, 0, 1),
+SR::Color::blue = Color(0, 0, 1, 1)
+;
 
 const SR::Color32 SR::Color32::black = Color32(0, 0, 0, 255), 
 SR::Color32::white = Color32(255), 
 SR::Color32::grey = Color32(128,128,128,255),
-SR::Color32::zero = Color32(0);
+SR::Color32::zero = Color32(0),
+SR::Color32::red = Color32(255, 0, 0, 1),
+SR::Color32::green = Color32(0, 255, 0, 1),
+SR::Color32::blue = Color32(0, 0, 255, 1)
+;
 
 SR::Color32::operator SR::Color() const
 {

@@ -7,7 +7,7 @@ namespace SR
 {
 	struct Varying { // 只能用float，且需要4字节对齐，因为未支持其他类型的插值
 		using ElemType = float;
-		virtual int size() const = 0;
+		virtual const int size() const = 0;
 		virtual Varying* Clone(bool bCopy = false) const = 0;
 
 		void* DataPtr() const { return ((char*)this) + sizeof(void*); }
@@ -16,13 +16,14 @@ namespace SR
 
 	template<typename T>
 	struct IVarying : Varying { // 只能用float，且需要4字节对齐，因为未支持其他类型的插值
-		virtual constexpr int size() const override {
+		virtual const int size() const override {
 			static_assert((sizeof(T) / sizeof(ElemType)) == (float(sizeof(T)) / sizeof(ElemType)), "Not align to ElemType");
-			return sizeof(T) / sizeof(ElemType) - 1;
+			return (sizeof(T) - sizeof(void*)) / sizeof(ElemType); // 减去虚指针
 		}
 		virtual Varying* Clone(bool bCopy = false) const override
 		{
-			return new T;
+			T* p = new T;
+			return p;
 		}
 	};
 
@@ -34,6 +35,8 @@ namespace SR
 	struct IUniform : Uniform { // 只能用float，且需要4字节对齐，因为未支持其他类型的插值
 		virtual Uniform* Clone(bool bCopy = false) const override
 		{
+			const T* ptr = dynamic_cast<const T*>(this);
+			if (bCopy && ptr) return new T(*ptr);
 			return new T;
 		}
 	};
@@ -91,7 +94,7 @@ namespace SR
 	struct VertexShaderOutput
 	{
 		int gl_VertexID;
-		Vec4 gl_Position;
+		Vec4 gl_Position = Vec4(0,0,0,1);
 		std::shared_ptr<Varying> varying;
 	};
 

@@ -2,7 +2,7 @@
 #include "Input.h"
 #include "Time.h"
 #include "Log.h"
-std::unique_ptr<SR::Camera> SR::Camera::mainCamera(nullptr);
+std::unique_ptr<SR::Camera> SR::Camera::mainCamera(new SR::Camera(Vec3(0, 0, 3), Vec3(0)));
 
 //SR::Camera::Camera():
 	//position(Vec3(0,0,0)),
