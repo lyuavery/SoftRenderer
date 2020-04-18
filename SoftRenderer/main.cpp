@@ -73,6 +73,9 @@ int main()
 {
 	// Camera
 	auto& mainCam = *SR::Camera::mainCamera;
+	mainCam.nearClip = 1.f;
+	mainCam.farClip = 10;
+	mainCam.fov = 75;
 	mainCam.viewport = SR::Viewport::main;
 	mainCam.RegisterInputListener();
 
@@ -95,7 +98,7 @@ int main()
 	if (backBuf)
 	{
 		if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
-		if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f,0.f,0.f);
+		if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::white.r, 0.f,0.f,0.f);
 	}
 	
 	// Init Render Tasks
@@ -107,8 +110,9 @@ int main()
 	task.frameBuffer = backBuf;
 	task.Bind(&vert, &varying);
 	task.Bind(&frag);
-	task.Bind(africanHead.get());
-	//task.state.depthFunc = SR::DepthFunc::Less;
+	task.Bind(tri.get());
+	task.state.depthFunc = SR::DepthFunc::Less;
+	task.state.bEarlyDepthTest = false;
 	// Time
 	SR::Time::Init();
 	float lastPrintTime = SR::Time::TimeSinceStartup();
@@ -122,12 +126,21 @@ int main()
 		if (backBuf)
 		{
 			if (backBuf->colorBuf) backBuf->colorBuf->Clear(SR::Color32::grey.r, SR::Color32::grey.g, SR::Color32::grey.b, SR::Color32::grey.a);
-			if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::black.r, 0.f, 0.f, 0.f);
+			if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::white.r, 0.f, 0.f, 0.f);
 		}
 
 		uniform.mat_ObjectToClip = mainCam.ProjectionMatrix() * mainCam.ViewMatrix();
+		uniform.tint = SR::Color::white;
 		task.Bind(&uniform);
 		task.Submit();
+
+		//uniform.mat_ObjectToClip *= Mat4::Translate(Vec3(0, 0, -1));
+		//uniform.tint = SR::Color::black;
+		//task.Bind(&uniform);
+		//task.Submit();
+		//
+		
+
 		SR::Renderer::GetInstance().RenderAll();
 
 		wnd.Update(deltaTime);

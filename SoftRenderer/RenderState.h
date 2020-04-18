@@ -22,8 +22,7 @@ namespace SR
 		}
 		virtual Varying* Clone(bool bCopy = false) const override
 		{
-			T* p = new T;
-			return p;
+			return new T;
 		}
 	};
 

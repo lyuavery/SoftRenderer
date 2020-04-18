@@ -83,7 +83,7 @@ namespace SR
 		std::shared_ptr<VertexShader> shader;
 		std::shared_ptr<Varying> varying;
 		std::shared_ptr<const Uniform> uniform;
-		VertexShaderOutput Dispatch(int iid, int vid, VertexShaderInput& input) // TODO：做多线程分发的
+		VertexShaderOutput Dispatch(int vid, VertexShaderInput& input) // TODO：做多线程分发的
 		{
 			std::shared_ptr<Varying> v(varying ? varying->Clone() : nullptr);
 			VertexShaderOutput output = (*shader)(input, v, uniform);
@@ -222,12 +222,13 @@ namespace SR
 
 }
 
-
+// 图元汇编后的管线流程为逐图元处理，否则测试时前面的图元深度还没写入
 template<typename T>
 void SR::Renderer::DepthTesting(DepthFunc f, const std::shared_ptr<const FrameBuffer>& fb, T& data) // Early Depth Test
 {
 	if (f == DepthFunc::Always || !fb->depthBuf) return;
-	while (!data.empty())
+	int size = data.size();
+	while (size--)
 	{
 		auto fragmentPtr = data.front();
 		auto& fragment = *fragmentPtr;

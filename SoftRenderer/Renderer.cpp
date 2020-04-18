@@ -18,6 +18,7 @@ void SR::Renderer::VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool 
 	if (!mesh) return;
 	auto& meshRef = *mesh;
 	auto& indices = meshRef.indices;
+
 	for (int i = 0, n = indices.size(); i < n; ++i)
 	{
 		// If cached, skip this vertex
@@ -38,7 +39,7 @@ void SR::Renderer::VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool 
 		if (mesh->IsValidAttribute(VertexAttribute::Normals)) in.normal = mesh->normals[idx];
 		if (mesh->IsValidAttribute(VertexAttribute::Tangents)) in.tangent = mesh->tangents[idx];
 		if (mesh->IsValidAttribute(VertexAttribute::Colors)) in.color = mesh->colors[idx];
-		out = vsDispatcher->Dispatch(i, idx, in);
+		out = vsDispatcher->Dispatch(idx, in);
 		vsOutputs.push(std::make_shared<VertexShaderOutput>(out));
 		if (cacheEnabled) cache->Cache(idx, out);
 	}
@@ -199,6 +200,7 @@ void SR::Renderer::Shading()
 	}
 }
 
+// 同一个drawcall内需要按primitive id的顺序做blending
 void SR::Renderer::Blending(BlendOp srcOp, BlendOp dstOp, const std::shared_ptr<FrameBuffer>& fb)
 {
 	while (!fsOutputs.empty())
@@ -206,6 +208,7 @@ void SR::Renderer::Blending(BlendOp srcOp, BlendOp dstOp, const std::shared_ptr<
 		auto pixelPtr = fsOutputs.front();
 		auto& pixel = *pixelPtr;
 		fsOutputs.pop();
+		
 		float srcR = pixel.color.r, srcG = pixel.color.g, srcB = pixel.color.b, srcA = pixel.color.a;
 		float dstR, dstG, dstB, dstA;
 		fb->colorBuf->Get(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, dstR, dstG, dstB, dstA);
@@ -232,6 +235,17 @@ void SR::Renderer::Blending(BlendOp srcOp, BlendOp dstOp, const std::shared_ptr<
 	}
 }
 
+class VertexStream
+{
+	std::shared_ptr<SR::Mesh> data;
+public:
+	VertexStream(const std::shared_ptr<SR::Mesh>& mesh)
+	{
+
+	}
+};
+
+
 void SR::Renderer::RenderAll()
 {
 	while (!tasks.empty())
@@ -245,6 +259,9 @@ void SR::Renderer::RenderAll()
 		vsDispatcher->shader = task.vert;
 		vsDispatcher->varying = task.varying;
 		vsDispatcher->uniform = std::const_pointer_cast<const Uniform>(task.uniform);
+
+
+
 		VertexProcessing(task.mesh, state.bPostTransformCache);
 
 		// Primitive Assembly
@@ -268,8 +285,7 @@ void SR::Renderer::RenderAll()
 		Shading();
 
 		// Per Fragment Ops: Depth Test
-		if (!state.bEarlyDepthTest)
-			DepthTesting(state.depthFunc, task.frameBuffer, fsOutputs);
+		DepthTesting(state.depthFunc, task.frameBuffer, fsOutputs);
 
 		// Per Fragment Ops: Blend
 		Blending(state.srcOp, state.dstOp, task.frameBuffer);
