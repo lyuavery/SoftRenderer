@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RenderState.h"
+#include "RenderStatus.h"
 #include "VertexShader.h"
 #include "FragmentShader.h"
 #include "Log.h"
@@ -19,14 +19,8 @@
 
 namespace SR
 {
-	// class Rasterizer
-	// class Interpolator
-	// class PrimitiveAssembler
-	// class Blender;
-
 	class PostTransformCache
 	{
-		friend class Renderer;
 		std::unordered_map<int, VertexShaderOutput> data;
 		std::queue<int> fifo;
 		int max;
@@ -75,33 +69,99 @@ namespace SR
 		}
 	};
 
-	class VSDispatcher
+	class RendererComponent
 	{
-		friend class Renderer;
 	public:
+		enum class State
+		{
+			Running, // 正在准备输出
+			Waiting, // 等待输入
+			Done, // 空闲
+		};
+		virtual void Reset() = 0;
+	};
 
-		std::shared_ptr<VertexShader> shader;
-		std::shared_ptr<Varying> varying;
-		std::shared_ptr<const Uniform> uniform;
+	class VertexProcessor : public RendererComponent
+	{
+	public:
+		static const int CACHE_SIZE = 30;
+
+		// args
+		std::shared_ptr<SR::Viewport> viewport;
+		std::shared_ptr<SR::VertexShader> vert;
+		std::shared_ptr<SR::Varying> varying;
+		std::shared_ptr<const SR::Uniform> uniform;
+		bool bCacheEnabled = true;
+
+		std::queue<std::shared_ptr<VertexShaderOutput>> outputs;
+
+		State Processing(std::shared_ptr<SR::Mesh>& mesh);
+		State PostProcessing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data);
+		virtual void Reset() override { 
+			begin = 0; 
+			decltype(outputs) tmp; outputs.swap(tmp);
+			cache.Clear();
+		}
+	private:
+		UInt32 begin;
+		PostTransformCache cache = PostTransformCache(CACHE_SIZE);
 		VertexShaderOutput Dispatch(int vid, VertexShaderInput& input) // TODO：做多线程分发的
 		{
 			std::shared_ptr<Varying> v(varying ? varying->Clone() : nullptr);
-			VertexShaderOutput output = (*shader)(input, v, uniform);
+			VertexShaderOutput output = (*vert)(input, v, uniform);
 			if (output.gl_Position.w == 0) output.gl_Position.w = 0.0000001f;
 			output.gl_VertexID = vid;
 			output.varying = v;
 			return output;
 		}
-		//VertexShaderOutput Wrapper();
 	};
 
-	class FSDispatcher
+	class PrimitiveAssembler : public RendererComponent
 	{
-		friend class Renderer;
+		int id;
 	public:
-		std::shared_ptr<FragmentShader> shader;
-		std::shared_ptr<const Uniform> uniform;
-		bool bEarlyDepthTest = false;
+		// args
+		PrimitiveAssemblyMode mode;
+		Culling cullFace;
+		FrontFace face;
+
+		std::queue<std::shared_ptr<PrimitiveAssemblyOutput>> outputs;
+
+		State Assembly(std::queue<std::shared_ptr<VertexShaderOutput>>& data);
+		virtual void Reset() override {
+			id = 0;
+			decltype(outputs) tmp; outputs.swap(tmp);
+		}
+
+		static int PrimitiveRequiredVertices(PrimitiveAssemblyMode mode)
+		{
+			int vnum = 0;
+			switch (mode)
+			{
+			case PrimitiveAssemblyMode::Triangles: { vnum = 3; break; }
+			}
+			return vnum;
+		}
+	};
+
+	class Rasterizer : public RendererComponent
+	{
+	public:
+		// args
+		PrimitiveAssemblyMode primitiveAssemblyMode;
+		InterpolationMode interpolationMode;
+		std::shared_ptr<SR::Viewport> viewport;
+
+		std::queue<std::shared_ptr<RasterOutput>> outputs;
+
+		State Rasterizing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data);
+		virtual void Reset() override {
+			decltype(outputs) tmp; outputs.swap(tmp);
+		}
+	};
+
+	class FragmentProcessor : public RendererComponent
+	{
 		FragmentShaderOutput Dispatch(FragmentShaderInput& input) // TODO：做多线程分发的
 		{
 			FragmentShaderOutput output;
@@ -109,9 +169,31 @@ namespace SR
 			input.varying.reset();
 			output.gl_FragCoord = input.gl_FragCoord;
 			output.gl_FragDepth = input.gl_FragDepth;
-			output.color = (*shader)(input, varying, uniform);
+			output.color = (*frag)(input, varying, uniform);
 			if (!bEarlyDepthTest) output.gl_FragDepth = input.gl_FragDepth;
 			return output;
+		}
+	public:
+		// args
+		std::shared_ptr<SR::FragmentShader> frag;
+		std::shared_ptr<SR::FrameBuffer> frameBuffer;
+		std::shared_ptr<const SR::Uniform> uniform;
+		DepthFunc depthFunc;
+		BlendOp srcOp;
+		BlendOp dstOp;
+		bool bEarlyDepthTest;
+
+		std::queue<std::shared_ptr<FragmentShaderOutput>> outputs;
+
+		template <typename T, 
+			typename = std::enable_if_t<
+			std::is_same_v<T, RasterOutput>||std::is_same_v<T, FragmentShaderOutput>, 
+			void>>
+		State DepthTesting(std::queue<std::shared_ptr<T>>& data);
+		State Shading(std::queue<std::shared_ptr<RasterOutput>>& data);
+		State Blending(std::queue<std::shared_ptr<FragmentShaderOutput>>& data);
+		virtual void Reset() override {
+			decltype(outputs) tmp; outputs.swap(tmp);
 		}
 	};
 
@@ -124,7 +206,7 @@ namespace SR
 		std::shared_ptr<FragmentShader> frag;
 		std::shared_ptr<SR::Viewport> viewport;
 	public:
-		RenderState state;
+		RenderStatus status;
 		std::shared_ptr<Uniform> uniform;
 		std::shared_ptr<FrameBuffer> frameBuffer;
 		void Viewport(const SR::Viewport* const v)
@@ -158,30 +240,14 @@ namespace SR
 
 	class Renderer
 	{
-		std::queue<std::shared_ptr<VertexShaderOutput>> vsOutputs;
-		std::queue<std::shared_ptr<PrimitiveAssemblyOutput>> paOutputs;
-		std::queue<std::shared_ptr<RasterOutput>> rasterOutputs;
-		std::queue<std::shared_ptr<FragmentShaderOutput>> fsOutputs;
 		std::queue<RenderTask> tasks;
-
-		std::unique_ptr<VSDispatcher> vsDispatcher;
-		std::unique_ptr<PostTransformCache> cache;
-		//std::unique_ptr<PrimitiveAssembler> primitiveAssembler;
-		//std::unique_ptr<Interpolator> interpolator;
-		//std::unique_ptr<Rasterizer> rasterizer;
-		std::unique_ptr<FSDispatcher> fsDispatcher;
-		//std::unique_ptr<Blender> blender;
+		
+		VertexProcessor vertexProcessor;
+		PrimitiveAssembler primitiveAssembler;
+		Rasterizer rasterizer;
+		FragmentProcessor fragmentProcessor;
 
 		static const int CACHE_SIZE = 30;
-		Renderer()
-			:vsDispatcher(new VSDispatcher)
-			, cache(new PostTransformCache(CACHE_SIZE))
-			//,primitiveAssembler(new PrimitiveAssembler)
-			//, rasterizer(new Rasterizer)
-			, fsDispatcher(new FSDispatcher)
-			//,blender(new Blender)
-		{
-		}
 	public:
 
 		void Push(const RenderTask& task)
@@ -196,37 +262,17 @@ namespace SR
 			return *instance;
 		}
 
-		//std::vector<std::unique_ptr< // cache hit要求gl_VertexID和gl_InstanceID 都与cache相等，这里不考虑实例化渲染，只考虑gl_VertexID
-		void VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool cacheEnabled);
-
-		// 前一个drawcall的图元的处理一定先于后一个drawcall的所有图元 https://www.khronos.org/opengl/wiki/Primitive_Assembly
-		// Assembly, Face Culling
-		void PrimitiveAssembly(PrimitiveAssemblyMode paMode, Culling cullFace, FrontFace face);
-
-		// Clipping, Perspective Divide, Viewport Transform
-		void VertexPostProcessing(const Viewport& viewport);
-
-		// Interpolation, Perspective Correction
-		void Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, InterpolationMode interpolationMode, const SR::Viewport& viewport);
-		
-		void Shading();
-		
-		template<typename T>
-		void DepthTesting(DepthFunc f, const std::shared_ptr<const FrameBuffer>& fb, T& data); // Early Depth Test
-		
-		void Blending(BlendOp srcOp, BlendOp dstOp, const std::shared_ptr<FrameBuffer>& fb);
-		
 		void RenderAll();
-		
 	};
 
 }
 
 // 图元汇编后的管线流程为逐图元处理，否则测试时前面的图元深度还没写入
-template<typename T>
-void SR::Renderer::DepthTesting(DepthFunc f, const std::shared_ptr<const FrameBuffer>& fb, T& data) // Early Depth Test
+template <typename T, typename>
+SR::RendererComponent::State SR::FragmentProcessor::DepthTesting(std::queue<std::shared_ptr<T>>& data) // Early Depth Test
 {
-	if (f == DepthFunc::Always || !fb->depthBuf) return;
+	auto& depthBuf = frameBuffer->depthBuf;
+	if (depthFunc == SR::DepthFunc::Always || !depthBuf) return SR::RendererComponent::State::Done;
 	int size = data.size();
 	while (size--)
 	{
@@ -235,9 +281,9 @@ void SR::Renderer::DepthTesting(DepthFunc f, const std::shared_ptr<const FrameBu
 		data.pop();
 		float z = fragment.gl_FragDepth;
 		float bufZ, tmp;
-		fb->depthBuf->Get(fragment.gl_FragCoord.x, fragment.gl_FragCoord.y, bufZ, tmp, tmp, tmp);
+		depthBuf->Get(fragment.gl_FragCoord.x, fragment.gl_FragCoord.y, bufZ, tmp, tmp, tmp);
 		bool pass = true;
-		switch (f)
+		switch (depthFunc)
 		{
 		case DepthFunc::Greater: { pass = z > bufZ; break; }
 		case DepthFunc::Less: { pass = z < bufZ; break; }
@@ -247,4 +293,5 @@ void SR::Renderer::DepthTesting(DepthFunc f, const std::shared_ptr<const FrameBu
 		}
 		if (pass) data.push(fragmentPtr);
 	}
+	return SR::RendererComponent::State::Done;
 }

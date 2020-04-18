@@ -108,6 +108,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -153,7 +154,7 @@
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshLoader.h" />
-    <ClInclude Include="RenderState.h" />
+    <ClInclude Include="RenderStatus.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Screen.h" />
     <ClInclude Include="Sealed.h" />

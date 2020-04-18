@@ -13,23 +13,20 @@ void SR::RenderTask::Submit()
 }
 
 //std::vector<std::unique_ptr< // cache hit要求gl_VertexID和gl_InstanceID 都与cache相等，这里不考虑实例化渲染，只考虑gl_VertexID
-void SR::Renderer::VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool cacheEnabled)
+SR::RendererComponent::State SR::VertexProcessor::Processing(std::shared_ptr<SR::Mesh>& mesh)
 {
-	if (!mesh) return;
-	auto& meshRef = *mesh;
-	auto& indices = meshRef.indices;
-
-	for (int i = 0, n = indices.size(); i < n; ++i)
+	if (!mesh || (begin >= mesh->indices.size())) return SR::RendererComponent::State::Done;
+	// If cached, skip this vertex
+	int idx = mesh->indices[begin++];
+	do
 	{
-		// If cached, skip this vertex
-		int idx = indices[i];
 		VertexShaderOutput out;
-		if (cacheEnabled)
+		if (bCacheEnabled)
 		{
-			if (cache->Get(idx, out))
+			if (cache.Get(idx, out))
 			{
-				vsOutputs.push(std::make_shared<VertexShaderOutput>(out));
-				continue;
+				outputs.push(std::make_shared<VertexShaderOutput>(out));
+				break;
 			}
 		}
 
@@ -39,62 +36,62 @@ void SR::Renderer::VertexProcessing(const std::shared_ptr<SR::Mesh>& mesh, bool 
 		if (mesh->IsValidAttribute(VertexAttribute::Normals)) in.normal = mesh->normals[idx];
 		if (mesh->IsValidAttribute(VertexAttribute::Tangents)) in.tangent = mesh->tangents[idx];
 		if (mesh->IsValidAttribute(VertexAttribute::Colors)) in.color = mesh->colors[idx];
-		out = vsDispatcher->Dispatch(idx, in);
-		vsOutputs.push(std::make_shared<VertexShaderOutput>(out));
-		if (cacheEnabled) cache->Cache(idx, out);
-	}
-	if (cacheEnabled) cache->Clear();
+		out = Dispatch(idx, in);
+		outputs.push(std::make_shared<VertexShaderOutput>(out));
+		if (bCacheEnabled) cache.Cache(idx, out);
+		break;
+	} while (false);
+	
+	return SR::RendererComponent::State::Running;
 }
 
 // 前一个drawcall的图元的处理一定先于后一个drawcall的所有图元 https://www.khronos.org/opengl/wiki/Primitive_Assembly
 // Assembly, Face Culling
-void SR::Renderer::PrimitiveAssembly(PrimitiveAssemblyMode paMode, Culling cullFace, FrontFace face)
+SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::shared_ptr<VertexShaderOutput>>& data)
 {
-	if (vsOutputs.empty()) return;
-	int vnum = 0;
-	switch (paMode)
+	if (data.empty()) return SR::RendererComponent::State::Done;
+	int vnum = PrimitiveRequiredVertices(mode);
+	if (vnum <= 0) SR::RendererComponent::State::Done;
+
+	int size = data.size();
+	if (size < vnum) return SR::RendererComponent::State::Waiting;
+
+	auto out = new PrimitiveAssemblyOutput;
+	for (int i = vnum; i--;)
 	{
-	case PrimitiveAssemblyMode::Triangles: { vnum = 3; break; }
+		auto v = data.front();
+		out->vertices.emplace_back(v);
+		data.pop();
 	}
-	if (vnum <= 0) return;
-	int size = vsOutputs.size();
-	int id = 0;
-	while (size >= vnum)
+	size -= vnum;
+
+	// TODO: Culling
+
+	// Calculate
+	bool frontFacing = 1 > 0 ? true : false;
+	if (face == FrontFace::CW) frontFacing = !frontFacing;
+	bool cull = !frontFacing;
+	if (cullFace == Culling::Front) cull = !cull;
+
+	if (!(cullFace != Culling::Off && cull))
 	{
-		auto out = new PrimitiveAssemblyOutput;
-		for (int i = vnum; i--;)
-		{
-			auto v = vsOutputs.front();
-			out->vertices.emplace_back(v);
-			vsOutputs.pop();
-		}
-		size -= vnum;
-
-		// TODO: Culling
-
-		// Calculate
-		bool frontFacing = 1 > 0 ? true : false;
-		if (face == FrontFace::CW) frontFacing = !frontFacing;
-		bool cull = !frontFacing;
-		if (cullFace == Culling::Front) cull = !cull;
-
-		if (cullFace != Culling::Off && cull) continue;
 		out->gl_FrontFacing = frontFacing;
 		out->gl_PrimitiveID = id++;
-		paOutputs.emplace(out);
-
+		outputs.emplace(out);
 	}
+
+	return SR::RendererComponent::State::Done;
 }
 
 // Clipping, Perspective Divide, Viewport Transform
-void SR::Renderer::VertexPostProcessing(const Viewport& viewport)
+SR::RendererComponent::State SR::VertexProcessor::PostProcessing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data)
 {
 	// Clipping
-	int size = paOutputs.size();
+	int size = data.size();
 	while (size--)
 	{
-		auto primitve = paOutputs.front();
-		paOutputs.pop();
+		auto primitve = data.front();
+		data.pop();
 		for (auto& v : primitve->vertices)
 		{
 			v->gl_Position.w = 1.f / v->gl_Position.w;
@@ -104,21 +101,22 @@ void SR::Renderer::VertexPostProcessing(const Viewport& viewport)
 			// TODO: Clipping
 
 
-			viewport.ApplyViewportTransform(v->gl_Position);
+			viewport->ApplyViewportTransform(v->gl_Position);
 			int x = 1;
 		}
-		paOutputs.push(primitve);
+		data.push(primitve);
 	}
+	return SR::RendererComponent::State::Done;
 }
 
 // Interpolation, Perspective Correction
-void SR::Renderer::Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, InterpolationMode interpolationMode, const SR::Viewport& viewport)
+SR::RendererComponent::State SR::Rasterizer::Rasterizing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data)
 {
-	if (primitiveAssemblyMode != PrimitiveAssemblyMode::Triangles) return;
-	while (!paOutputs.empty())
+	if (primitiveAssemblyMode != PrimitiveAssemblyMode::Triangles) return SR::RendererComponent::State::Done;
+	while (!data.empty())
 	{
-		PrimitiveAssemblyOutput primitve = *paOutputs.front();
-		paOutputs.pop();
+		PrimitiveAssemblyOutput primitve = *data.front();
+		data.pop();
 		VertexShaderOutput& v0 = *primitve.vertices[0]; // x,y,z in window space, w = linear depth
 		VertexShaderOutput& v1 = *primitve.vertices[1];
 		VertexShaderOutput& v2 = *primitve.vertices[2];
@@ -128,7 +126,7 @@ void SR::Renderer::Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, Inte
 		Vec3 zv = Vec3(v0.gl_Position.z, v1.gl_Position.z, v2.gl_Position.z);
 		Vec3 wv = Vec3(v0.gl_Position.w, v1.gl_Position.w, v2.gl_Position.w);
 		float fltMax = sbm::Math::FloatMax;
-		Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(viewport.width, viewport.height);
+		Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(viewport->width, viewport->height);
 		for (int i = 0; i < 2; ++i) { // 取ceil保证浮点转整型时样本点在三角形内
 			bboxMax[i] = (sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] })));
 			bboxMin[i] = (sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
@@ -179,39 +177,43 @@ void SR::Renderer::Rasterizing(PrimitiveAssemblyMode primitiveAssemblyMode, Inte
 							++i;
 					}
 				}
-				
-				rasterOutputs.emplace(out);
+
+				outputs.emplace(out);
 			}
 		}
 	}
+	return SR::RendererComponent::State::Done;
 }
 
-void SR::Renderer::Shading()
+SR::RendererComponent::State SR::FragmentProcessor::Shading(std::queue<std::shared_ptr<RasterOutput>>& data)
 {
-	while (!rasterOutputs.empty())
+	while (!data.empty())
 	{
-		auto fragPtr = rasterOutputs.front();
+		auto fragPtr = data.front();
 		auto& fragment = *fragPtr;
-		rasterOutputs.pop();
+		data.pop();
 
-		std::shared_ptr<FragmentShaderOutput> output;
-		output = std::make_shared<FragmentShaderOutput>(fsDispatcher->Dispatch(fragment));
-		fsOutputs.push(output);
+		std::shared_ptr<FragmentShaderOutput> out;
+		out = std::make_shared<FragmentShaderOutput>(Dispatch(fragment));
+		outputs.push(out);
 	}
+	return SR::RendererComponent::State::Done;
 }
 
 // 同一个drawcall内需要按primitive id的顺序做blending
-void SR::Renderer::Blending(BlendOp srcOp, BlendOp dstOp, const std::shared_ptr<FrameBuffer>& fb)
+SR::RendererComponent::State SR::FragmentProcessor::Blending(std::queue<std::shared_ptr<FragmentShaderOutput>>& data)
 {
-	while (!fsOutputs.empty())
+	auto& colorBuf = frameBuffer->colorBuf;
+	auto& depthBuf = frameBuffer->depthBuf;
+	while (!data.empty())
 	{
-		auto pixelPtr = fsOutputs.front();
+		auto pixelPtr = data.front();
 		auto& pixel = *pixelPtr;
-		fsOutputs.pop();
-		
+		data.pop();
+
 		float srcR = pixel.color.r, srcG = pixel.color.g, srcB = pixel.color.b, srcA = pixel.color.a;
 		float dstR, dstG, dstB, dstA;
-		fb->colorBuf->Get(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, dstR, dstG, dstB, dstA);
+		colorBuf->Get(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, dstR, dstG, dstB, dstA);
 		switch (srcOp)
 		{
 		case SR::BlendOp::One:
@@ -229,65 +231,123 @@ void SR::Renderer::Blending(BlendOp srcOp, BlendOp dstOp, const std::shared_ptr<
 			break;
 		}
 		float r = srcR + dstR, g = srcG + dstG, b = srcB + dstB, a = srcA + dstA;
-		fb->colorBuf->Set(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, r, g, b, a);
-		if (!fb->depthBuf) return;
-		fb->depthBuf->Set(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, pixel.gl_FragDepth, pixel.gl_FragDepth, pixel.gl_FragDepth, pixel.gl_FragDepth);
+		colorBuf->Set(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, r, g, b, a);
+		if (depthBuf)
+		{
+			depthBuf->Set(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, pixel.gl_FragDepth, pixel.gl_FragDepth, pixel.gl_FragDepth, pixel.gl_FragDepth);
+		}
 	}
+	return SR::RendererComponent::State::Done;
 }
-
-class VertexStream
-{
-	std::shared_ptr<SR::Mesh> data;
-public:
-	VertexStream(const std::shared_ptr<SR::Mesh>& mesh)
-	{
-
-	}
-};
-
 
 void SR::Renderer::RenderAll()
 {
 	while (!tasks.empty())
 	{
 		RenderTask task = tasks.front();
-		RenderState& state = task.state;
+		RenderStatus& status = task.status;
 		tasks.pop();
 
-		// Vertex Shader Invoked
 		assert(bool(task.vert));
-		vsDispatcher->shader = task.vert;
-		vsDispatcher->varying = task.varying;
-		vsDispatcher->uniform = std::const_pointer_cast<const Uniform>(task.uniform);
 
+		vertexProcessor.Reset();
+		vertexProcessor.viewport = task.viewport;
+		vertexProcessor.vert = task.vert;
+		vertexProcessor.varying = task.varying;
+		vertexProcessor.uniform = std::const_pointer_cast<const Uniform>(task.uniform);
+		vertexProcessor.bCacheEnabled = task.status.bPostTransformCache;
 
+		primitiveAssembler.Reset();
+		primitiveAssembler.mode = status.primitiveAssemblyMode;
+		primitiveAssembler.cullFace = status.cullFace;
+		primitiveAssembler.face = status.face;
 
-		VertexProcessing(task.mesh, state.bPostTransformCache);
+		rasterizer.Reset();
+		rasterizer.primitiveAssemblyMode = status.primitiveAssemblyMode;
+		rasterizer.interpolationMode = status.interpolationMode;
+		rasterizer.viewport = task.viewport;
 
-		// Primitive Assembly
-		PrimitiveAssembly(state.primitiveAssemblyMode, state.cullFace, state.face);
+		fragmentProcessor.Reset();
+		fragmentProcessor.frag = task.frag;
+		fragmentProcessor.frameBuffer = task.frameBuffer;
+		fragmentProcessor.uniform = vertexProcessor.uniform;
+		fragmentProcessor.depthFunc = status.depthFunc;
+		fragmentProcessor.srcOp = status.srcOp;
+		fragmentProcessor.dstOp = status.dstOp;
+		fragmentProcessor.bEarlyDepthTest = status.bEarlyDepthTest;
 
-		// Clip, Viewport Transform, Cull
-		VertexPostProcessing(*(task.viewport));
+		//// Vertex Shader Invoked
+		//vsDispatcher->shader = task.vert;
+		//vsDispatcher->varying = task.varying;
+		//vsDispatcher->uniform = std::const_pointer_cast<const Uniform>(task.uniform);
+		//assert(bool(task.frag));
+		//fsDispatcher->shader = task.frag;
+		//fsDispatcher->uniform = vsDispatcher->uniform;
+		//fsDispatcher->bEarlyDepthTest = status.bEarlyDepthTest;
 
-		// Rasterize
-		Rasterizing(state.primitiveAssemblyMode, state.interpolationMode, *task.viewport);
+		// 只要有一个running就继续，如果全都是done就跳出
+		// 如果存在waiting但前面的流程没有一个是running的，证明是饥饿（starving），需要强制跳出
+		while (true)
+		{
+			bool done = true;
+			RendererComponent::State state;
+			state = vertexProcessor.Processing(task.mesh);
+			done = done && (RendererComponent::State::Done == state);
 
-		// Early Test: Depth Test
-		if (state.bEarlyDepthTest)
-			DepthTesting(state.depthFunc, task.frameBuffer, rasterOutputs);
+			state = primitiveAssembler.Assembly(vertexProcessor.outputs);
+			if (RendererComponent::State::Waiting == state && done)
+			{
+				XLogWarning("Primitive Assembler starving, force to exit.")
+				break;
+			}
+			done = done && (RendererComponent::State::Done == state);
 
-		// Fragment Shader Invoked
-		assert(bool(task.frag));
-		fsDispatcher->shader = task.frag;
-		fsDispatcher->uniform = vsDispatcher->uniform;
-		fsDispatcher->bEarlyDepthTest = state.bEarlyDepthTest;
-		Shading();
+			state = vertexProcessor.PostProcessing(primitiveAssembler.outputs);
+			done = done && (RendererComponent::State::Done == state);
 
-		// Per Fragment Ops: Depth Test
-		DepthTesting(state.depthFunc, task.frameBuffer, fsOutputs);
+			state = rasterizer.Rasterizing(primitiveAssembler.outputs);
+			done = done && (RendererComponent::State::Done == state);
 
-		// Per Fragment Ops: Blend
-		Blending(state.srcOp, state.dstOp, task.frameBuffer);
+			if (fragmentProcessor.bEarlyDepthTest)
+			{
+				state = fragmentProcessor.DepthTesting(rasterizer.outputs);
+				done = done && (RendererComponent::State::Done == state);
+			}
+			state = fragmentProcessor.Shading(rasterizer.outputs);
+			done = done && (RendererComponent::State::Done == state);
+
+			state = fragmentProcessor.DepthTesting(fragmentProcessor.outputs);
+			done = done && (RendererComponent::State::Done == state);
+
+			state = fragmentProcessor.Blending(fragmentProcessor.outputs);
+			done = done && (RendererComponent::State::Done == state);
+
+			if (done) break; // All done
+		}
+
+		//VertexProcessing(task.mesh, status.bPostTransformCache);
+
+		//// Primitive Assembly, Cull
+		//PrimitiveAssembly(status.primitiveAssemblyMode, status.cullFace, status.face);
+
+		//// Clip, Viewport Transform
+		//VertexPostProcessing(*(task.viewport));
+
+		//// Rasterize
+		//Rasterizing(status.primitiveAssemblyMode, status.interpolationMode, *task.viewport);
+
+		//// Early Test: Depth Test
+		//if (status.bEarlyDepthTest)
+		//	DepthTesting(status.depthFunc, task.frameBuffer, rasterOutputs);
+
+		//// Fragment Shader Invoked
+		//
+		//Shading();
+
+		//// Per Fragment Ops: Depth Test
+		//DepthTesting(status.depthFunc, task.frameBuffer, fsOutputs);
+
+		//// Per Fragment Ops: Blend
+		//Blending(status.srcOp, status.dstOp, task.frameBuffer);
 	}
 }

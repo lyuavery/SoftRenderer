@@ -1,5 +1,5 @@
 #pragma once
-#include "RenderState.h"
+#include "RenderStatus.h"
 namespace SR
 {
 	class FragmentShader

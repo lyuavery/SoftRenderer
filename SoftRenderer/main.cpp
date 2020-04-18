@@ -110,9 +110,10 @@ int main()
 	task.frameBuffer = backBuf;
 	task.Bind(&vert, &varying);
 	task.Bind(&frag);
-	task.Bind(tri.get());
-	task.state.depthFunc = SR::DepthFunc::Less;
-	task.state.bEarlyDepthTest = false;
+	task.Bind(africanHead.get());
+	task.status.depthFunc = SR::DepthFunc::Less;
+	task.status.bEarlyDepthTest = false;
+
 	// Time
 	SR::Time::Init();
 	float lastPrintTime = SR::Time::TimeSinceStartup();
@@ -130,7 +131,6 @@ int main()
 		}
 
 		uniform.mat_ObjectToClip = mainCam.ProjectionMatrix() * mainCam.ViewMatrix();
-		uniform.tint = SR::Color::white;
 		task.Bind(&uniform);
 		task.Submit();
 
@@ -138,8 +138,6 @@ int main()
 		//uniform.tint = SR::Color::black;
 		//task.Bind(&uniform);
 		//task.Submit();
-		//
-		
 
 		SR::Renderer::GetInstance().RenderAll();
 

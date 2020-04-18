@@ -152,13 +152,13 @@
     <ClInclude Include="VertexShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RenderState.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CommonShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GauroudShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderStatus.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
