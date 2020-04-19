@@ -128,8 +128,8 @@ SR::RendererComponent::State SR::Rasterizer::Rasterizing(std::queue<std::shared_
 		float fltMax = sbm::Math::FloatMax;
 		Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(viewport->width, viewport->height);
 		for (int i = 0; i < 2; ++i) { // 取ceil保证浮点转整型时样本点在三角形内
-			bboxMax[i] = (sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] })));
-			bboxMin[i] = (sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
+			bboxMax[i] = sbm::ceil(sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] }))-1);
+			bboxMin[i] = sbm::ceil(sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
 		}
 
 		bool hasCustomedVarying = bool(v0.varying);
@@ -144,7 +144,10 @@ SR::RendererComponent::State SR::Rasterizer::Rasterizing(std::queue<std::shared_
 				if (lambda3[0] < .0f || lambda3[1] < .0f || lambda3[2] < .0f) {
 					continue;
 				}
-
+				/*if (lambda3[0] > .01f && lambda3[1] > .01f && lambda3[2] > .01f)
+				{
+					continue;
+				}*/
 				RasterOutput* out = new RasterOutput;
 
 				float w;
@@ -174,8 +177,14 @@ SR::RendererComponent::State SR::Rasterizer::Rasterizing(std::queue<std::shared_
 					while (i < size)
 					{
 						(*out->varying)[i] = lambda3.x * (*v0.varying)[i] + lambda3.y * (*v1.varying)[i] + lambda3.z * (*v2.varying)[i],
-							++i;
+						++i;
 					}
+					/*float value = (*out->varying)[2];
+					if (value < 0.9 && value > -0.9)
+					{
+						float x0 = (*v0.varying)[2], x1 = (*v1.varying)[2], x2 = (*v2.varying)[2];
+						throw - 1;
+					}*/
 				}
 
 				outputs.emplace(out);
@@ -234,7 +243,7 @@ SR::RendererComponent::State SR::FragmentProcessor::Blending(std::queue<std::sha
 		colorBuf->Set(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, r, g, b, a);
 		if (depthBuf)
 		{
-			depthBuf->Set(pixel.gl_FragCoord.x, pixel.gl_FragCoord.y, pixel.gl_FragDepth, pixel.gl_FragDepth, pixel.gl_FragDepth, pixel.gl_FragDepth);
+			depthBuf->Set((pixel.gl_FragCoord.x), (pixel.gl_FragCoord.y), pixel.gl_FragDepth);
 		}
 	}
 	return SR::RendererComponent::State::Done;

@@ -1,16 +1,39 @@
 #pragma once
 #include <initializer_list>
 #include <cmath>
+#include <type_traits>
 #include "Vector.h"
 #include "Math.h"
 // TODO：<T>vec<int>泛型创建向量结构体
 // TODO：数学库
 namespace sbm
 {
-	template<typename T>
-	inline T abs(T num)
+	union _IEEESingle
+	{
+		float Float;
+		struct
+		{
+			uint32_t Frac : 23;
+			uint32_t Exp : 8;
+			uint32_t Sign : 1;
+		} IEEE;
+	};
+
+	template<typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>, void>>
+	inline T abs(const T& num)
 	{
 		return num >= 0 ? num : -num;
+	}
+
+	template<typename T, size_t N, typename = std::enable_if_t<std::is_arithmetic_v<T>, void>>
+	inline sbm::Vec<T,N> abs(const sbm::Vec<T, N>& v)
+	{
+		sbm::Vec<T, N> t;
+		for (int i = 0; i < N; ++i)
+		{
+			t[i] = v[i];
+		}
+		return t;
 	}
 
 	template<typename T>
@@ -104,6 +127,11 @@ namespace sbm
 		float rcpArea = 1.0f / lambda.z;
 		// 除以lambda.z来规范重心坐标和为1
 		return sbm::Vec<T, 3>(1.f - (lambda.x + lambda.y) * rcpArea, lambda.x * rcpArea, lambda.y * rcpArea);
+	}
+
+	inline bool is_special_float(float in)
+	{
+		return (reinterpret_cast<_IEEESingle*>(&in)->IEEE.Exp == (1u << 8) - 1);
 	}
 
 	float sin(float rad);

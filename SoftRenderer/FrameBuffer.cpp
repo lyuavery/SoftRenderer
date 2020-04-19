@@ -4,13 +4,13 @@
 
 void SR::FrameBufferAttachment::Set(int x, int y, float r, float g, float b, float a)
 {
-	if (x >= width || x < 0 || y < 0 || y >= height) return;
-	auto offset = (x + y * width) * bytespp;
-	auto ptr = reinterpret_cast<Byte*>(buffer);
-
 	switch (format)
 	{
 	case SR::FrameBufferAttachmentFormat::Depth32: {
+		if (x >= width || x < 0 || y < 0 || y >= height) return;
+		auto offset = (x + y * width) * bytespp;
+		auto ptr = reinterpret_cast<Byte*>(buffer);
+
 		*((float*)(ptr + offset)) = r;
 		break;
 	}
@@ -24,7 +24,6 @@ void SR::FrameBufferAttachment::Set(int x, int y, float r, float g, float b, flo
 		break;
 	}
 	}
-	
 }
 
 void SR::FrameBufferAttachment::Set(int x, int y, Byte r, Byte g, Byte b, Byte a)
@@ -64,10 +63,8 @@ void SR::FrameBufferAttachment::Set(int x, int y, Byte r, Byte g, Byte b, Byte a
 
 int SR::FrameBufferAttachment::Get(int x, int y, float& r, float& g, float& b, float& a) const
 {
-	if (x >= width || x < 0 || y < 0 || y >= height) return -1;
 	int components = 0;
-	auto ptr = reinterpret_cast<Byte*>(buffer);
-	auto offset = (x + y * width) * bytespp;
+	
 	switch (format)
 	{
 	case SR::FrameBufferAttachmentFormat::BGR24: 
@@ -79,6 +76,10 @@ int SR::FrameBufferAttachment::Get(int x, int y, float& r, float& g, float& b, f
 		break;
 	}
 	case SR::FrameBufferAttachmentFormat::Depth32: {
+		if (x >= width || x < 0 || y < 0 || y >= height) return -1;
+		auto ptr = reinterpret_cast<Byte*>(buffer);
+		auto offset = (x + y * width) * bytespp;
+
 		components = 1;
 		r = *((float*)(ptr + offset));
 		break;

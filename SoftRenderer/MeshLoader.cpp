@@ -30,20 +30,25 @@ SR::Mesh* SR::MeshLoader::Load(const std::string& fileName, bool bGenerateTangen
 			c = tolower(c);
 		}
 		if (ext == "obj") {
-			return LoadObj(fileName, bGenerateNormals);
+			mesh = LoadObj(fileName, bGenerateNormals);
 		}
 		else {
 			XLogWarning("Unsopported file ext: %s", ext.c_str());
-			return nullptr;
 		}
 	} while (false);
-	if (bGenerateTangents)
-	{
-		mesh->EnableAttribute(true, VertexAttribute::Tangents);
-		GenerateTangents(mesh);
-	}
+	
 	if (mesh)
 	{
+		if (bGenerateNormals)
+		{
+			mesh->EnableAttribute(true, VertexAttribute::Normals);
+			GenerateNormals(mesh);
+		}
+		if (bGenerateTangents)
+		{
+			mesh->EnableAttribute(true, VertexAttribute::Tangents);
+			GenerateTangents(mesh);
+		}
 		mesh->indices.shrink_to_fit();
 		mesh->vertices.shrink_to_fit();
 		mesh->uvs.shrink_to_fit();
@@ -64,11 +69,18 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 
 	SR::Mesh* mesh = new SR::Mesh;
 	std::string line;
-	std::vector<UInt32> uvIndices;
-	std::vector<UInt32> normalIndices;
 	bool hasVertices = false;
 	bool hasIndices = false;
+
+	auto& indices = mesh->indices;
+	auto& vertices = mesh->vertices;
+	auto& normals = mesh->normals;
+	auto& uvs = mesh->uvs;
 	bool bRemap = false;
+	const UInt32 limit = (1 << 16) - 1;
+	std::unordered_map<UInt64, Vec4ui> props;
+	UInt32 propCnt = 0;
+	std::vector<UInt64> propsRef;
 	while (!in.eof()) {
 		std::getline(in, line);
 		std::istringstream iss(line);
@@ -78,7 +90,7 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 			iss >> trash;
 			Vec3 v;
 			for (int i = 0; i < 3; i++) iss >> v[i];
-			mesh->vertices.push_back(v);
+			vertices.push_back(v);
 		}
 		else if (!line.compare(0, 3, "vn ")) {
 			if (bGenerateNormals) continue;
@@ -86,106 +98,96 @@ SR::Mesh* SR::MeshLoader::LoadObj(const std::string& fileName, bool bGenerateNor
 			iss >> trash >> trash;
 			Vec3 n;
 			for (int i = 0; i < 3; i++) iss >> n[i];
-			mesh->normals.push_back(n);
+			normals.push_back(n);
 		}
 		else if (!line.compare(0, 3, "vt ")) {
 			mesh->EnableAttribute(true, VertexAttribute::UVs);
 			iss >> trash >> trash;
 			Vec2 uv;
 			for (int i = 0; i < 2; i++) iss >> uv[i];
-			mesh->uvs.push_back(uv);
+			uvs.push_back(uv);
 		}
-		else if (!line.compare(0, 2, "f ")) {
+		else if (!line.compare(0, 2, "f ")) {  // 索引范围暂时只支持到[0,2^16-1]
 			hasIndices = true;
 			int v0,v1,v2;
 			iss >> trash;
 			while (iss >> v0 >> trash >> v1 >> trash >> v2) {
 				--v0; --v1; --v2;
-				mesh->indices.push_back(v0);
 				if (v0 != v1 || v0 != v2 || v1 != v2) bRemap = true;
-				uvIndices.push_back(v1);
-				if (!bGenerateNormals)
-				{
-					normalIndices.push_back(v2);
-				}
+				assert(v0 < limit && v1 < limit && v2 < limit);
+
+				UInt64 key = (UInt64(v0) << 48) + (UInt64(v1) << 32) + (bGenerateNormals ? 0 : (UInt64(v2) << 16));
+				if (props.find(key) == props.end()) props[key] = Vec4ui(v0, v1, v2, propCnt++);
+				propsRef.push_back(key);
+				indices.push_back(v0);
 			}
 		}
 	}
 	if (!(hasVertices && hasIndices))
 	{
-		XLogWarning("Invalid obj fmt: %s.\n", fileName.c_str());
+		XLogWarning("Obj file has no vertices or indices: %s.\n", fileName.c_str());
 		return nullptr;
 	}
 
-	// obj文件不同顶点属性可能会有不同的索引值，而IBO只能放一个类型的索引。以最大的一个属性的索引为准，重新调整其他属性的数据顺序
+	// 根据索引调整buffer
 	if (bRemap)
 	{
-		int maxsize = 0;
-		int maxi = -1;
-		int ss[] = {
-			mesh->vertices.size(), 
-			mesh->uvs.size(),
-			!bGenerateNormals ? mesh->normals.size() : 0
-		};
-		std::vector<UInt32>* ptrs[] = { &mesh->indices, &uvIndices, &normalIndices };
-		for (int i = 0, n = sizeof(ss) / sizeof(int); i < n; ++i)
+		auto maxsize = props.size();
+		std::vector<UInt32> idxRemap(indices.size(), -1);
+		std::vector<Vec3> verRemap(maxsize, Vec3(0));
+		std::vector<Vec2> uvRemap(maxsize, Vec2(0));
+		std::vector<Vec3> nRemap(bGenerateNormals ? 0 : maxsize, Vec3(0));
+		
+		for (int i = 0, n = propsRef.size(); i < n; ++i)
 		{
-			if (ss[i] > maxsize)
-			{
-				maxsize = ss[i];
-				maxi = i;
-			}
+			auto& vec = props[propsRef[i]];
+			idxRemap[i] = vec.w;
+			verRemap[vec.w] = vertices[vec.x];
+			uvRemap[vec.w] = uvs[vec.y];
+			if(!bGenerateNormals) nRemap[vec.w] = normals[vec.z];
 		}
-		if (maxi < 0)
-		{
-			XLogError("Unknown Error while loading mesh: %s.\n", fileName.c_str());
-			return nullptr;
-		}
-
-		int mask = 7 & ~(1 << maxi);
-		bool notPosMain = bool(mask & 1);
-		bool notUVMain = bool(mask & 2);
-		bool notNMain = bool(mask & 4);
-		std::vector<UInt32>& ref = *ptrs[maxi];
-		std::vector<Vec3> verRemap;
-		std::vector<Vec2> uvRemap;
-		std::vector<Vec3> nRemap;
-		if (notPosMain) verRemap.resize(maxsize, Vec3(0));
-		if (notUVMain) uvRemap.resize(maxsize, Vec2(0));
-		if (notNMain) nRemap.resize(maxsize, Vec3(0));
-		for (int i = 0, n = ref.size(); i < n; ++i)
-		{
-			if (notPosMain) verRemap[ref[i]] = mesh->vertices[mesh->indices[i]];
-			if (notUVMain) uvRemap[ref[i]] = mesh->uvs[uvIndices[i]];
-			if (notNMain) nRemap[ref[i]] = mesh->normals[normalIndices[i]];
-		}
-		if (notPosMain) mesh->vertices.swap(verRemap);
-		if (notUVMain) mesh->uvs.swap(uvRemap);
-		if (notNMain) mesh->normals.swap(nRemap);
-		mesh->indices.swap(ref);
+		vertices.swap(verRemap);
+		uvs.swap(uvRemap);
+		if (!bGenerateNormals) normals.swap(nRemap);
+		indices.swap(idxRemap);
 	}
 	
 	XLogInfo("Load mesh successfully: %s, v# %d, f# %d, vt# %d, vn# %d\n", fileName.c_str(), mesh->vertices.size(), mesh->indices.size(), mesh->uvs.size(), mesh->normals.size());
 	return mesh;
 }
 
+void SR::MeshLoader::GenerateNormals(Mesh* mesh) // TODO
+{
+	XLogWarning("TODO: GenerateNormals ");
+}
+
 void SR::MeshLoader::GenerateTangents(SR::Mesh* mesh)
 {
-	if (!mesh) return;
+	
+	if (!mesh || mesh->vertices.empty() || mesh->uvs.empty() || mesh->normals.empty()) return;
+	auto& vertices = mesh->vertices;
+	auto& uvs = mesh->uvs;
+	auto& normals = mesh->normals;
+
 	const auto& f = mesh->indices;
+	int vSize = mesh->vertices.size();
+	std::vector<Vec4> tangents(vSize, Vec4(0));
+	std::vector<Vec3> bitangents(vSize, Vec3(0));
+
 	for (int i = 0, n = mesh->indices.size(); i < n; i += 3)
 	{
-		const auto& pos0 = mesh->vertices[f[i + 0]];
-		const auto& pos1 = mesh->vertices[f[i + 1]];
-		const auto& pos2 = mesh->vertices[f[i + 2]];
+		UInt32 id0 = f[i], id1 = f[i + 1], id2 = f[i + 2];
+		const auto& pos0 = vertices[id0];
+		const auto& pos1 = vertices[id1];
+		const auto& pos2 = vertices[id2];
 
-		const auto& uv0 = mesh->uvs[f[i + 1]];
-		const auto& uv1 = mesh->uvs[f[i + 1]];
-		const auto& uv2 = mesh->uvs[f[i + 1]];
+		const auto& uv0 = uvs[id0];
+		const auto& uv1 = uvs[id1];
+		const auto& uv2 = uvs[id2];
 
-		const auto& n0 = mesh->normals[f[i + 2]];
-		const auto& n1 = mesh->normals[f[i + 2]];
-		const auto& n2 = mesh->normals[f[i + 2]];
+		const auto& n0 = normals[id0];
+		const auto& n1 = normals[id1];
+		const auto& n2 = normals[id2];
 
 		sbm::Matrix<2, 2> uvMat({ uv1.x - uv0.x, uv2.x - uv0.x,uv1.y - uv0.y, uv2.y - uv0.y });
 		sbm::Matrix<2, 3> posMat({
@@ -196,14 +198,39 @@ void SR::MeshLoader::GenerateTangents(SR::Mesh* mesh)
 		auto tbMat = uvMat.GetInversed() * posMat;
 		Vec3 tangent = tbMat.GetRow(0);
 		Vec3 bitangent = tbMat.GetRow(1);
-		Vec3 normal = Cross(bitangent, tangent);
-		float w0 = sbm::Dot(normal, n0) < 0 ? -1 : 1;
+		//Vec3 normal = Cross(bitangent, tangent);
+		tangents[id0] += tangent.Normalized().Expanded<4>(0);
+		tangents[id1] += tangent.Normalized().Expanded<4>(0);
+		tangents[id2] += tangent.Normalized().Expanded<4>(0);
+		bitangents[id0] += bitangent.Normalized();
+		bitangents[id1] += bitangent.Normalized();
+		bitangents[id2] += bitangent.Normalized();
+	/*	float w0 = sbm::Dot(normal, n0) < 0 ? -1 : 1;
 		float w1 = Dot(normal, n1) < 0 ? -1 : 1;
-		float w2 = Dot(normal, n2) < 0 ? -1 : 1;
-		mesh->tangents.push_back((tangent - Dot(tangent, n0) * n0).Normalized().Expanded<4>(w0));
-		mesh->tangents.push_back((tangent - Dot(tangent, n1) * n1).Normalized().Expanded<4>(w1));
-		mesh->tangents.push_back((tangent - Dot(tangent, n2) * n2).Normalized().Expanded<4>(w2));
+		float w2 = Dot(normal, n2) < 0 ? -1 : 1;*/
+	/*	tangents.push_back((tangent - Dot(tangent, n0) * n0).Normalized().Expanded<4>(w0));
+		tangents.push_back((tangent - Dot(tangent, n1) * n1).Normalized().Expanded<4>(w1));
+		tangents.push_back((tangent - Dot(tangent, n2) * n2).Normalized().Expanded<4>(w2));*/
+
+	/*	tangents.push_back((tangent ).Normalized().Expanded<4>(w0));
+		tangents.push_back((tangent ).Normalized().Expanded<4>(w1));
+		tangents.push_back((tangent ).Normalized().Expanded<4>(w2));*/
+	//https://www.marti.works/calculating-tangents-for-your-mesh/
+		/*tangents[id0] = tangents[id0] + (tangent - Dot(tangent, n0) * n0).Normalized().Expanded<4>(w0);
+		tangents[id1] = tangents[id1] + (tangent - Dot(tangent, n1) * n1).Normalized().Expanded<4>(w1);
+		tangents[id2] = tangents[id2] + (tangent - Dot(tangent, n2) * n2).Normalized().Expanded<4>(w2);*/
 	}
 
-	assert(mesh->tangents.size() == mesh->vertices.size());
+	for (int i = 0, n = vSize; i < n; ++i)
+	{
+		Vec3 tangent = tangents[i].Normalized().Truncated<3>();
+		bitangents[i].Normalize();
+		Vec3 normal = normals[i].Normalized();
+
+		tangent = (tangent - sbm::Dot(tangent, normal) * normal).Normalized();
+		float w = (sbm::Dot(bitangents[i], sbm::Cross(normal, tangent)) < 0) ? -1 : 1;
+		//assert(!sbm::is_special_float(w));
+		tangents[i] = tangent.Expanded<4>(w);
+	}
+	mesh->tangents.swap(tangents);
 }

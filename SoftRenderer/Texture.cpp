@@ -78,8 +78,9 @@ int SR::Texture2D::Get(int x, int y, float& r, float& g, float& b, float& a) con
 	case SR::TextureFormat::BGRA32:
 	case SR::TextureFormat::ARGB32: {
 		Byte _r, _g, _b, _a;
+		float denom = 1.f / 255;
 		components = Get(x, y, _r, _g, _b, _a);
-		r = _r, g = _g, b = _b, a = _a;
+		r = _r * denom, g = _g * denom, b = _b * denom, a = _a * denom;
 		break;
 	}
 	}
@@ -126,7 +127,7 @@ int SR::Texture2D::Get(int x, int y, Byte& r, Byte& g, Byte& b, Byte& a) const
 	}
 	case SR::TextureFormat::A8: {
 		components = 1;
-		a = *(ptr + offset);
+		r = g = b = a = *(ptr + offset);
 		break;
 	}
 	}

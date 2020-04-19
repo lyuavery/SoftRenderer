@@ -27,18 +27,12 @@ namespace SR
 		{ }
 		FrameBufferAttachment() = delete;
 
-		/*virtual void SetColor(int x, int y, const Color&) override;
-		virtual void SetColor32(int x, int y, const Color32&) override;
-		virtual Color GetColor(int x, int y) const override;
-		virtual Color32 GetColor32(int x, int y) const override;
-		virtual void Clear(const Color& c) override;
-		virtual void Clear(const Color32& c) override;*/
-		virtual void Set(int x, int y, Byte, Byte, Byte, Byte);
-		virtual void Set(int x, int y, float, float, float, float);
-		virtual int Get(int x, int y, Byte&, Byte&, Byte&, Byte&) const;
-		virtual int Get(int x, int y, float&, float&, float&, float&) const;
-		virtual void Clear(Byte, Byte, Byte, Byte);
-		virtual void Clear(float, float, float, float);
+		virtual void Set(int x, int y, Byte, Byte, Byte, Byte) override;
+		virtual void Set(int x, int y, float, float, float, float) override;
+		virtual int Get(int x, int y, Byte&, Byte&, Byte&, Byte&) const override;
+		virtual int Get(int x, int y, float&, float&, float&, float&) const override;
+		virtual void Clear(Byte, Byte, Byte, Byte)  override;
+		virtual void Clear(float, float, float, float) override;
 
 		static int GetFormatChannels(FrameBufferAttachmentFormat fmt);
 		static int GetFormatBytesPerPixel(FrameBufferAttachmentFormat fmt);

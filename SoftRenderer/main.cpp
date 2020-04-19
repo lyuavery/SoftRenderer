@@ -20,6 +20,7 @@
 #include "Window.h"
 #include "Renderer.h"
 #include "CommonShader.h"
+#include "BlinnPhongShader.h"
 #include "Header.h"
 
 static int gWidth = 800;
@@ -81,15 +82,27 @@ int main()
 
 	gViewportMat = mainCam.ViewportTransform();
 	gCameraPos = mainCam.position;
-
+	
 	// Resources
-	std::shared_ptr<SR::Mesh> tri(SR::MeshLoader::GetInstance().Load("Resources/tri.obj"));
-	std::shared_ptr<SR::Mesh> box(SR::MeshLoader::GetInstance().Load("Resources/box.obj"));
-	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj"));
-	//SR::TGALoader tgaLoader;
-	//std::shared_ptr<SR::Texture2D> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	//std::shared_ptr<SR::Texture2D> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	//std::shared_ptr<SR::Texture2D> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	SR::TGALoader tgaLoader;
+	//std::shared_ptr<SR::Mesh> tri(SR::MeshLoader::GetInstance().Load("Resources/tri.obj"));
+	//std::shared_ptr<SR::Mesh> box(SR::MeshLoader::GetInstance().Load("Resources/box.obj", true));
+	//std::shared_ptr<SR::Mesh> sphere(SR::MeshLoader::GetInstance().Load("Resources/sphere.obj", true));
+	
+	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj", true));
+	std::shared_ptr<SR::Texture> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	std::shared_ptr<SR::Texture> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	std::shared_ptr<SR::Texture> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	
+	//std::shared_ptr<SR::Mesh> africanHeadEyeInner(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head_eye_inner.obj", true));
+	//std::shared_ptr<SR::Texture> africanHeadEyeInnerDiffuse(tgaLoader.Load("Resources/african_head/african_head_eye_inner_diffuse.tga"));// 
+	//std::shared_ptr<SR::Texture> africanHeadEyeInnerNormal(tgaLoader.Load("Resources/african_head/african_head_eye_inner_nm_tangent.tga"));// 
+	//std::shared_ptr<SR::Texture> africanHeadEyeInnerSpec(tgaLoader.Load("Resources/african_head/african_head_eye_inner_spec.tga"));// 
+	//
+	//std::shared_ptr<SR::Mesh> africanHeadEyeOuter(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head_eye_outer.obj", true));
+	//std::shared_ptr<SR::Texture> africanHeadEyeOuterDiffuse(tgaLoader.Load("Resources/african_head/african_head_eye_outer_diffuse.tga"));// 
+	//std::shared_ptr<SR::Texture> africanHeadEyeOuterNormal(tgaLoader.Load("Resources/african_head/african_head_eye_outer_nm_tangent.tga"));// 
+	//std::shared_ptr<SR::Texture> africanHeadEyeOuterSpec(tgaLoader.Load("Resources/african_head/african_head_eye_outer_spec.tga"));// 
 
 	// Window
 	auto& wnd = SR::Window::GetInstance();
@@ -102,17 +115,29 @@ int main()
 	}
 	
 	// Init Render Tasks
-	SR::CommonVert vert;
+	/*SR::CommonVert vert;
 	SR::CommonFrag frag;
 	SR::CommonVarying varying;
-	SR::CommonUniform uniform;
+	SR::CommonUniform uniform;*/
+	SR::BlinnPhongVert vert;
+	SR::BlinnPhongFrag frag;
+	SR::BlinnPhongVarying varying;
+	SR::BlinnPhongUniform uniform;
 	SR::RenderTask task;
 	task.frameBuffer = backBuf;
+	task.status.depthFunc = SR::DepthFunc::Less;
+	task.status.bEarlyDepthTest = true;
 	task.Bind(&vert, &varying);
 	task.Bind(&frag);
 	task.Bind(africanHead.get());
-	task.status.depthFunc = SR::DepthFunc::Less;
-	task.status.bEarlyDepthTest = false;
+	uniform.albedo = africanHeadDiffuse;
+	uniform.normal = africanHeadNormal;
+	uniform.spec = africanHeadSpec;
+	uniform.worldLightDir = Vec3(-1);
+	uniform.mat_ObjectToWorld = Mat4::Identity;
+
+	//SR::RenderTask task1 = task, task2 = task;
+	//task1.Bind()
 
 	// Time
 	SR::Time::Init();
@@ -130,6 +155,7 @@ int main()
 			if (backBuf->depthBuf) backBuf->depthBuf->Clear(SR::Color::white.r, 0.f, 0.f, 0.f);
 		}
 
+		uniform.worldCamPos = mainCam.position;
 		uniform.mat_ObjectToClip = mainCam.ProjectionMatrix() * mainCam.ViewMatrix();
 		task.Bind(&uniform);
 		task.Submit();

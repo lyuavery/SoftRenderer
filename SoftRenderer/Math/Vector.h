@@ -342,6 +342,7 @@ typedef sbm::Vec<double, 3> Vec3d;
 typedef sbm::Vec<double, 4> Vec4d;
 typedef sbm::Vec<int, 2> Vec2i;
 typedef sbm::Vec<int, 3> Vec3i;
+typedef sbm::Vec<unsigned int, 4> Vec4ui;
 typedef sbm::Vec<unsigned char, 4> Vec4uc;
 
 

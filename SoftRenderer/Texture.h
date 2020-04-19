@@ -39,10 +39,14 @@ namespace SR
 		virtual void Clear(const Color& c = Color::black) = 0;
 		virtual void Clear(const Color32& c = Color32::black) = 0;*/
 		
+		virtual inline void Set(int x, int y, Byte v) { Set(x, y, v, v, v, v); }
+		virtual inline void Set(int x, int y, float v) { Set(x, y, v, v, v, v); }
 		virtual void Set(int x, int y, Byte, Byte, Byte, Byte) = 0;
 		virtual void Set(int x, int y, float, float, float, float) = 0;
-		virtual inline int Get(int x, int y, Byte&, Byte&, Byte&, Byte&) const = 0;
-		virtual inline int Get(int x, int y, float&, float&, float&, float&) const = 0;
+		virtual int Get(int x, int y, Byte&, Byte&, Byte&, Byte&) const = 0;
+		virtual int Get(int x, int y, float&, float&, float&, float&) const = 0;
+		virtual inline void Get(int x, int y, Byte& v) const { std::remove_reference_t<decltype(v)> tmp; Get(x, y, v, tmp, tmp, tmp); }
+		virtual inline void Get(int x, int y, float& v) const { std::remove_reference_t<decltype(v)> tmp; Get(x, y, v, tmp, tmp, tmp); }
 		virtual void Clear(Byte, Byte, Byte, Byte) = 0;
 		virtual void Clear(float, float, float, float) = 0;
 
