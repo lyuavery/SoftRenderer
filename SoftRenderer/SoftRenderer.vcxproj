@@ -126,11 +126,13 @@
     <ClCompile Include="Math\Math.cpp" />
     <ClCompile Include="Math\Matrix.cpp" />
     <ClCompile Include="Math\Matrix4x4.cpp" />
+    <ClCompile Include="Math\Quaternion.cpp" />
     <ClCompile Include="Math\Utility.cpp" />
     <ClCompile Include="Math\Vector.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="MeshLoader.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RenderStatus.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Time.cpp" />
@@ -143,6 +145,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Color.h" />
     <ClInclude Include="CommonShader.h" />
+    <ClInclude Include="DefaultWireframeShader.h" />
     <ClInclude Include="FragmentShader.h" />
     <ClInclude Include="FrameBuffer.h" />
     <ClInclude Include="GauroudShader.h" />
@@ -152,6 +155,7 @@
     <ClInclude Include="Math\Math.h" />
     <ClInclude Include="Math\Matrix.h" />
     <ClInclude Include="Math\Matrix4x4.h" />
+    <ClInclude Include="Math\Quaternion.h" />
     <ClInclude Include="Math\Utility.h" />
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="Mesh.h" />

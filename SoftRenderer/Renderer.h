@@ -12,6 +12,7 @@
 #include "Mesh.h"
 #include "FrameBuffer.h"
 #include "Viewport.h"
+#include "DefaultWireframeShader.h"
 
 #include <queue>
 #include <unordered_map>
@@ -146,15 +147,23 @@ namespace SR
 
 	class Rasterizer : public RendererComponent
 	{
+		void RasterizeLine(const Vec4& v0, const Vec4& v1, bool frontFace, int primitiveID);
+		void RasterizeWireTriangle(const SR::PrimitiveAssemblyOutput& primitive);
+		void RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& primitive);
 	public:
+		
+		std::shared_ptr<VertexShader> defaultWireframeVert = std::make_shared<DefaultWireframeVert>();
+		std::shared_ptr<FragmentShader> defaultWireframeFrag = std::make_shared<DefaultWireframeFrag>();
+		std::shared_ptr<Varying> defaultWireframeVarying = std::make_shared<DefaultWireframeVarying>();
+		std::shared_ptr<Uniform> defaultWireframeUniform = std::make_shared<DefaultWireframeUniform>();
 		// args
 		PrimitiveAssemblyMode primitiveAssemblyMode;
 		InterpolationMode interpolationMode;
 		std::shared_ptr<SR::Viewport> viewport;
-
+		RasterizationMode rasterizationMode;
 		std::queue<std::shared_ptr<RasterOutput>> outputs;
 
-		State Rasterizing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data);
+		State Rasterizing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data, SR::RasterizationMode mode);
 		virtual void Reset() override {
 			decltype(outputs) tmp; outputs.swap(tmp);
 		}
@@ -280,8 +289,8 @@ SR::RendererComponent::State SR::FragmentProcessor::DepthTesting(std::queue<std:
 		auto& fragment = *fragmentPtr;
 		data.pop();
 		float z = fragment.gl_FragDepth;
-		float bufZ, tmp;
-		depthBuf->Get(fragment.gl_FragCoord.x, fragment.gl_FragCoord.y, bufZ, tmp, tmp, tmp);
+		float bufZ;
+		depthBuf->Get(fragment.gl_FragCoord.x, fragment.gl_FragCoord.y, bufZ);
 		bool pass = true;
 		switch (depthFunc)
 		{

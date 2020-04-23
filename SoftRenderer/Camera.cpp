@@ -256,6 +256,10 @@ void SR::Camera::Orbit(float deltaPhi, float deltaTheta, bool constrain)
 	front = position - center;
 
 	UpdateCameraBasis();
+
+	/*Quaternion rotation = view.m_Rotation.target;
+	rotation = Quaternion.AngleAxis(evt.delta.y * .003f * Mathf.Rad2Deg, rotation * Vector3.right) * rotation;
+	rotation = Quaternion.AngleAxis(evt.delta.x * .003f * Mathf.Rad2Deg, Vector3.up) * rotation;*/
 }
 
 void SR::Camera::Rotate(float deltaYaw, float deltaPitch, bool constrain)

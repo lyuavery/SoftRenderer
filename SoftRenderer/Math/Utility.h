@@ -31,7 +31,7 @@ namespace sbm
 		sbm::Vec<T, N> t;
 		for (int i = 0; i < N; ++i)
 		{
-			t[i] = v[i];
+			t[i] = abs(v[i]);
 		}
 		return t;
 	}

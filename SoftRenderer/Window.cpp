@@ -15,7 +15,7 @@ static SR::KeyCode TranslateVK2KeyCode(WPARAM param)
 			break;
 		}
 
-		if (param >= '0' && param <= '1')
+		if (param >= '0' && param <= '9')
 		{
 			code = SR::KeyCode(int(param - '0') + int(SR::KeyCode::Alpha0));
 			break;
