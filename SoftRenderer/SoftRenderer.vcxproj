@@ -148,7 +148,6 @@
     <ClInclude Include="DefaultWireframeShader.h" />
     <ClInclude Include="FragmentShader.h" />
     <ClInclude Include="FrameBuffer.h" />
-    <ClInclude Include="GauroudShader.h" />
     <ClInclude Include="Header.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Log.h" />

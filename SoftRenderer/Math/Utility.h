@@ -118,7 +118,13 @@ namespace sbm
 	}
 
 	template<typename T>
-	sbm::Vec<T, 3> barycentric(const sbm::Vec<T, 2>& v0, const sbm::Vec<T, 2>& v1, const sbm::Vec<T, 2>& v2, const sbm::Vec<T, 2>& p)
+	inline T edge_function(const sbm::Vec<T, 2>& v0, const sbm::Vec<T, 2>& v1, const sbm::Vec<T, 2>& p)
+	{
+		return  (p.x - v0.x) * (v1.y - v0.y) - (p.y - v0.y) * (v1.x - v0.x); // 这里p可以提取出来做优化，因为在三角形的v0v1v2固定
+	}
+
+	template<typename T>
+	inline sbm::Vec<T, 3> barycentric(const sbm::Vec<T, 2>& v0, const sbm::Vec<T, 2>& v1, const sbm::Vec<T, 2>& v2, const sbm::Vec<T, 2>& p)
 	{
 		// (u, v, 1) 与（AB.x, AC.x, PA.x) 和（AB.y, AC.y, PA.y) 正交，
 		sbm::Vec<T, 3> lambda = Cross(sbm::Vec<T, 3>(v1.x - v0.x, v2.x - v0.x, v0.x - p.x), sbm::Vec<T, 3>(v1.y - v0.y, v2.y - v0.y, v0.y - p.y));

@@ -164,9 +164,6 @@
     <ClInclude Include="CommonShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GauroudShader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RenderStatus.h">
       <Filter>Header Files</Filter>
     </ClInclude>

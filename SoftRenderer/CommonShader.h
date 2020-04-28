@@ -61,20 +61,9 @@ namespace SR
 				// Diffuse
 			auto diffuse = sbm::Dot(worldNormal, lightDir) * 0.5f + 0.5f;
 			auto ambient = Vec4(0.1f, 0.1f, 0.1f, 1);
-			auto a = (lightDir + viewDir).Normalized();
-			auto e = sbm::Dot(a, worldNormal);
-			auto b = sbm::clamp01(e);
+			auto spec = sbm::pow(sbm::clamp01(sbm::Dot((lightDir + viewDir).Normalized(), worldNormal)), 32.f);
 
-			auto spec = sbm::pow(b, 32.f);
-		/*	auto c = sbm::Dot(refl, viewDir);
-			auto d = sbm::clamp01(c);
-			auto spec = sbm::pow(d,  32.f);*/
-			//return VecToColor(Vec4(spec));
-			if (spec > 0.2f)
-			{
-				int x = 1;
-			}
-			return VecToColor( (0.8f * diffuse + 0.6f * spec + ambient));
+			return VecToColor( (0.8f * diffuse + 0.3f * spec + ambient));
 				
 				// Test Box
 				//ºÚ£¬»Ò£¬°×£¬

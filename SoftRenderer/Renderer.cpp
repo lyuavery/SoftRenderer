@@ -45,10 +45,87 @@ SR::RendererComponent::State SR::VertexProcessor::Processing(std::shared_ptr<SR:
 	return SR::RendererComponent::State::Running;
 }
 
+float SR::PrimitiveAssembler::CalIntersectRatio(const Vec4& ps, const Vec4& pe, Axis axis)
+{
+	float t = -1;
+	if (axis == Axis::W)
+	{
+		t = (W_CLIPPED_PLANE - ps.w) / (pe.w - ps.w);
+	}
+	else
+	{
+		int idx = (int)axis;
+		int sign = idx > 0 ? 1 : -1;
+		idx = idx * sign - 1;
+		float i0 = ps[idx], w0 = ps.w, di = pe[idx] - ps[idx], dw = pe.w - ps.w;
+		t = (w0 - sign * i0) / (sign * di - dw);
+	}
+	return t;
+}
+
+std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::ClippingAgainstPlane(const std::vector<std::shared_ptr<SR::VertexShaderOutput>>& polygon, Axis axis)
+{
+	std::vector<std::shared_ptr<SR::VertexShaderOutput>> out;
+	for (int i = 0, n = polygon.size(); i < n; ++i)
+	{
+		auto& ps = *polygon[i%n];
+		auto& pe = *polygon[(i+1)%n];
+		bool inside0 = IsInside(ps.gl_Position, axis);
+		bool insidet = IsInside(pe.gl_Position, axis);
+		if (insidet != inside0)
+		{
+			float t = CalIntersectRatio(ps.gl_Position, pe.gl_Position, axis);
+
+			SR::VertexShaderOutput p;
+			p.gl_VertexID = insidet ? ps.gl_VertexID : pe.gl_VertexID;
+			p.gl_Position = ps.gl_Position + (pe.gl_Position - ps.gl_Position) * t;
+			int size = bool(ps.varying) ? ps.varying->size() : 0;
+			int i = 0;
+			if(size > 0) p.varying.reset(ps.varying->Clone());
+			while (i < size)
+			{
+				(*p.varying)[i] = (*ps.varying)[i] + ((*pe.varying)[i] - (*ps.varying)[i]) * t;
+				++i;
+			}
+			out.emplace_back(std::make_shared<SR::VertexShaderOutput>(p));
+		}
+		if (insidet)
+		{
+			out.emplace_back(std::make_shared<SR::VertexShaderOutput>(pe));
+		}
+	}
+	return out;
+}
+
+
+std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::HomogeneousClipping(const std::vector<std::shared_ptr<VertexShaderOutput>>& polygon)
+{
+	return polygon;
+	bool bNeedClipped = false;
+	for (auto& v : polygon)
+	{
+		bNeedClipped |= !IsVisible(v->gl_Position);
+		if (bNeedClipped) break;
+	}
+
+	if (!bNeedClipped) return polygon;
+	int i = 0;
+	std::vector<std::shared_ptr<VertexShaderOutput>> pingpong[2] = { polygon };
+	const Axis plane[] = { W,POSITIVE_X,NEGATIVE_X,POSITIVE_Y,NEGATIVE_Y,POSITIVE_Z,NEGATIVE_Z }; // w,x,-x,y,-y,z,-z
+	for (auto k : plane)
+	{
+		pingpong[(i + 1) % 2] = std::move(ClippingAgainstPlane(pingpong[i], k));
+		i = (i + 1) % 2;
+	}
+	return pingpong[i];
+}
+
 // 前一个drawcall的图元的处理一定先于后一个drawcall的所有图元 https://www.khronos.org/opengl/wiki/Primitive_Assembly
-// Assembly, Face Culling
+// Perspective Divide, Assembly, Clipping, Viewport Transform, Culling
+// 1.获得3个裁剪空间的顶点的信息，2.裁剪获得新的多边形并生成新顶点的信息，3.三角化，生成新图元，4.透视除法，5.cvv剔除，6.视口变换，7.背面剔除
 SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::shared_ptr<VertexShaderOutput>>& data)
 {
+	assert(mode == PrimitiveAssemblyMode::Triangles);
 	if (data.empty()) return SR::RendererComponent::State::Done;
 	int vnum = PrimitiveRequiredVertices(mode);
 	if (vnum <= 0) SR::RendererComponent::State::Done;
@@ -56,58 +133,89 @@ SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::sh
 	int size = data.size();
 	if (size < vnum) return SR::RendererComponent::State::Waiting;
 
-	auto out = new PrimitiveAssemblyOutput;
+	std::vector<std::shared_ptr<VertexShaderOutput>> vertices;
+	vertices.reserve(3);
 	for (int i = vnum; i--;)
 	{
 		auto v = data.front();
-		out->vertices.emplace_back(v);
+		vertices.emplace_back(v);
 		data.pop();
 	}
 	size -= vnum;
 
-	// TODO: Culling
+	// TODO: Clipping
+	auto clippedVertices = HomogeneousClipping(vertices);
 
-	// Calculate
-	bool frontFacing = 1 > 0 ? true : false;
-	if (face == FrontFace::CW) frontFacing = !frontFacing;
-	bool cull = !frontFacing;
-	if (cullFace == Culling::Front) cull = !cull;
-
-	if (!(cullFace != Culling::Off && cull))
+	// Assembly
+	for (int i = 0, n = clippedVertices.size(); i < n - 2; ++i)
 	{
-		out->gl_FrontFacing = frontFacing;
-		out->gl_PrimitiveID = id++;
-		outputs.emplace(out);
-	}
-
-	return SR::RendererComponent::State::Done;
-}
-
-// Clipping, Perspective Divide, Viewport Transform
-SR::RendererComponent::State SR::VertexProcessor::PostProcessing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data)
-{
-	// Clipping
-	int size = data.size();
-	while (size--)
-	{
-		auto primitve = data.front();
-		data.pop();
-		for (auto& v : primitve->vertices)
+		auto out = new PrimitiveAssemblyOutput;
+		out->vertices.reserve(3);
+		out->vertices.push_back(clippedVertices[0]);
+		out->vertices.push_back(clippedVertices[i + 1]);
+		out->vertices.push_back(clippedVertices[i + 2]);
+		
+		// Perspective Division
+		for (auto& v : out->vertices)
 		{
 			v->gl_Position.w = 1.f / v->gl_Position.w;
 			v->gl_Position.x *= v->gl_Position.w;
 			v->gl_Position.y *= v->gl_Position.w;
 			v->gl_Position.z *= v->gl_Position.w;
-			// TODO: Clipping
-
-
 			viewport->ApplyViewportTransform(v->gl_Position);
-			int x = 1;
 		}
-		data.push(primitve);
+		
+		// Culling
+		float a = 0;
+		for (int k = 0, m = out->vertices.size(); k < m; ++k)
+		{
+			a = out->vertices[k]->gl_Position.x * out->vertices[(k+1)%m]->gl_Position.y - out->vertices[(k + 1) % m]->gl_Position.x * out->vertices[k]->gl_Position.y;
+		}
+		bool frontFacing = a > 0;
+		if (viewport->bTopDown) frontFacing = !frontFacing; // window屏幕坐标y轴反了，需要翻转一次
+		if (face == FrontFace::CW) frontFacing = !frontFacing;
+
+		bool cull = !frontFacing;
+		if (cullFace == Culling::Front) cull = !cull;
+		if (!(cullFace != Culling::Off && cull))
+		{
+			out->gl_FrontFacing = frontFacing;
+			out->gl_PrimitiveID = id++;
+			outputs.emplace(out);
+		}
 	}
+
 	return SR::RendererComponent::State::Done;
 }
+
+// Perspective Divide, Clipping, Viewport Transform, Culling
+//SR::RendererComponent::State SR::VertexProcessor::PostProcessing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data)
+//{
+//	// Clipping
+//	int size = data.size();
+//	while (size--)
+//	{
+//		auto primitve = data.front();
+//		data.pop();
+//		for (auto& v : primitve->vertices)
+//		{
+//			// Perspective Divide
+//			v->gl_Position.w = 1.f / v->gl_Position.w;
+//			v->gl_Position.x *= v->gl_Position.w;
+//			v->gl_Position.y *= v->gl_Position.w;
+//			v->gl_Position.z *= v->gl_Position.w;
+//			// TODO: Clipping
+//
+//
+//			// Viewport Transform
+//			viewport->ApplyViewportTransform(v->gl_Position);
+//
+//			int x = 1;
+//		}
+//		data.push(primitve);
+//	}
+//	return SR::RendererComponent::State::Done;
+//}
 
 void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& primitive)
 {
@@ -120,15 +228,12 @@ void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& 
 	Vec2 p2 = v2.gl_Position.Truncated<2>();
 	Vec3 zv = Vec3(v0.gl_Position.z, v1.gl_Position.z, v2.gl_Position.z);
 	Vec3 wv = Vec3(v0.gl_Position.w, v1.gl_Position.w, v2.gl_Position.w);
-
-
+	Vec2 edge[3] = { p2 - p1 ,p0 - p2,p1 - p0 };
 	float fltMax = sbm::Math::FloatMax;
 	Vec2 bboxMin(fltMax, fltMax), bboxMax(-fltMax, -fltMax), clamp(viewport->width, viewport->height);
 	for (int i = 0; i < 2; ++i) { // 取ceil保证浮点转整型时样本点在三角形内
 		bboxMax[i] = sbm::ceil(sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] })) - 1);
 		bboxMin[i] = sbm::ceil(sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
-		//bboxMax[i] = (sbm::min(clamp[i], sbm::max({ p0[i], p1[i],  p2[i] })));
-		//bboxMin[i] = (sbm::max(0.f, sbm::min({ bboxMax[i], p0[i], p1[i], p2[i] })));
 	}
 	bool hasCustomedVarying = bool(v0.varying);
 	assert(hasCustomedVarying ? (v0.varying->size() == v1.varying->size()) && (v0.varying->size() == v2.varying->size()) : true);
@@ -137,11 +242,15 @@ void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& 
 	{
 		for (int j = bboxMin.x; j <= bboxMax.x; ++j)
 		{
-			Vec2 p(j, i);
+			Vec2 p(j + 0.5f, i + 0.5f);
 			Vec3 lambda3 = barycentric(p0, p1, p2, p);
-			if (lambda3[0] < .0f || lambda3[1] < .0f || lambda3[2] < .0f) {
-				continue;
+			bool overlap = true;
+			for (int i = 0; i < 3; ++i)
+			{
+				// Top-Left Rule
+				overlap &= (lambda3[i] == 0) ? ((edge[i].x < 0 && edge[i].y == 0) || edge[i].y < 0) : (lambda3[i] > 0);
 			}
+			if (!overlap) continue;
 			/*if (rasterizationMode == RasterizationMode::Line)
 			{
 				if (lambda3[0] > .01f && lambda3[1] > .01f && lambda3[2] > .01f)
@@ -179,14 +288,8 @@ void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& 
 				while (i < size)
 				{
 					(*out->varying)[i] = lambda3.x * (*v0.varying)[i] + lambda3.y * (*v1.varying)[i] + lambda3.z * (*v2.varying)[i],
-						++i;
+					++i;
 				}
-				/*float value = (*out->varying)[2];
-				if (value < 0.9 && value > -0.9)
-				{
-					float x0 = (*v0.varying)[2], x1 = (*v1.varying)[2], x2 = (*v2.varying)[2];
-					throw - 1;
-				}*/
 			}
 
 			outputs.emplace(out);
@@ -305,8 +408,6 @@ void SR::Rasterizer::RasterizeLine(const Vec4& v0, const Vec4& v1, bool frontFac
 	}
 }
 
-
-
 // Interpolation, Perspective Correction
 SR::RendererComponent::State SR::Rasterizer::Rasterizing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data, SR::RasterizationMode mode)
 {
@@ -419,7 +520,7 @@ void SR::Renderer::RenderAll()
 				vertexProcessor.uniform = std::const_pointer_cast<const Uniform>(task.uniform);
 			}
 			vertexProcessor.Reset();
-			vertexProcessor.viewport = task.viewport;
+			//vertexProcessor.viewport = task.viewport;
 			vertexProcessor.vert = drawLine ? rasterizer.defaultWireframeVert : task.vert;
 			vertexProcessor.varying = drawLine ? std::shared_ptr<Varying>()  : task.varying;
 			vertexProcessor.bCacheEnabled = task.status.bPostTransformCache;
@@ -428,6 +529,7 @@ void SR::Renderer::RenderAll()
 			primitiveAssembler.mode = status.primitiveAssemblyMode;
 			primitiveAssembler.cullFace = status.cullFace;
 			primitiveAssembler.face = status.face;
+			primitiveAssembler.viewport = task.viewport;
 
 			rasterizer.Reset();
 			rasterizer.primitiveAssemblyMode = status.primitiveAssemblyMode;
@@ -461,8 +563,8 @@ void SR::Renderer::RenderAll()
 				}
 				done = done && (RendererComponent::State::Done == state);
 
-				state = vertexProcessor.PostProcessing(primitiveAssembler.outputs);
-				done = done && (RendererComponent::State::Done == state);
+				//state = vertexProcessor.PostProcessing(primitiveAssembler.outputs);
+				//done = done && (RendererComponent::State::Done == state);
 
 				state = rasterizer.Rasterizing(primitiveAssembler.outputs, status.rasterizationMode);
 				done = done && (RendererComponent::State::Done == state);

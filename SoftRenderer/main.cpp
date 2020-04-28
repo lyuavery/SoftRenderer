@@ -74,14 +74,14 @@ int main()
 {
 	// Camera
 	auto& mainCam = *SR::Camera::mainCamera;
-	mainCam.nearClip = 1.f;
+	mainCam.nearClip = 0.01f;
 	mainCam.farClip = 50;
 	mainCam.fov = 75;
 	mainCam.viewport = SR::Viewport::main;
 	mainCam.RegisterInputListener();
 
 	gViewportMat = mainCam.ViewportTransform();
-	mainCam.position = Vec3(-1.8, -1.8, -2);
+	mainCam.position = Vec3(0,0,5);
 	gCameraPos = mainCam.position;
 	mainCam.LookAt(Vec3::zero);
 	// Resources
@@ -91,12 +91,12 @@ int main()
 	std::shared_ptr<SR::Mesh> sphere(SR::MeshLoader::GetInstance().Load("Resources/sphere.obj", true));
 	std::shared_ptr<SR::Mesh> floor(SR::MeshLoader::GetInstance().Load("Resources/floor/floor.obj", true));
 	std::shared_ptr<SR::Texture> floorDiffuse(tgaLoader.Load("Resources/floor/floor_diffuse.tga"));// 
-	
-	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj", true));
-	std::shared_ptr<SR::Texture> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	std::shared_ptr<SR::Texture> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	std::shared_ptr<SR::Texture> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
-	
+	//
+	//std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj", true));
+	//std::shared_ptr<SR::Texture> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	//std::shared_ptr<SR::Texture> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	//std::shared_ptr<SR::Texture> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	//
 	//std::shared_ptr<SR::Mesh> bianka_s(SR::MeshLoader::GetInstance().Load("Resources/bianka_s.obj", true));
 	
 	//std::shared_ptr<SR::Mesh> africanHeadEyeInner(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head_eye_inner.obj", true));
@@ -120,7 +120,7 @@ int main()
 	}
 	
 
-	Mat4 modelTRS = Mat4::TRS(Vec3::zero, Vec3(0, 0, 0), Vec3(1, 1, 1));
+	Mat4 modelTRS = Mat4::TRS(Vec3(0,0,0), Vec3(0, 0, 0), Vec3(1.f));
 	//Mat4 modelTRS1 = Mat4::TRS(Vec3(0,0,0), Vec3(0, 0, 0), Vec3(.5f,.5f,.5f));
 	Mat4 modelTRTInv = modelTRS.GetInversed();
 	// Init Render Tasks
@@ -140,20 +140,21 @@ int main()
 	//drawFloor.Bind(floor.get());
 	//drawFloor.status.rasterizationMode = SR::RasterizationMode::Line;
 
-	SR::BlinnPhongVert blinnVert;
-	SR::BlinnPhongFrag blinnFrag;
-	SR::BlinnPhongVarying blinnVarying;
-	SR::BlinnPhongUniform blinnUniform;
-	blinnUniform.albedo = africanHeadDiffuse;
-	blinnUniform.normal = africanHeadNormal;
-	blinnUniform.spec = africanHeadSpec;
-	blinnUniform.worldLightDir = Vec3(-1);
-	blinnUniform.mat_ObjectToWorld = modelTRS;
+	//SR::BlinnPhongVert blinnVert;
+	//SR::BlinnPhongFrag blinnFrag;
+	//SR::BlinnPhongVarying blinnVarying;
+	//SR::BlinnPhongUniform blinnUniform;
+	//blinnUniform.albedo = africanHeadDiffuse;
+	//blinnUniform.normal = africanHeadNormal;
+	//blinnUniform.spec = africanHeadSpec;
+	//blinnUniform.worldLightDir = Vec3(-1);
+	//blinnUniform.mat_ObjectToWorld = modelTRS;
 
 	SR::RenderStatus status;
 	status.depthFunc = SR::DepthFunc::Less;
 	status.bEarlyDepthTest = true;
 	status.rasterizationMode = SR::RasterizationMode::Filled;
+	status.cullFace = SR::Culling::Back;
 	SR::RenderTask task;
 	task.status = status;
 	task.frameBuffer = backBuf;
@@ -166,11 +167,11 @@ int main()
 
 	task.Bind(&commonVert, &commonVarying);
 	task.Bind(&commonFrag);
-	task.Bind(africanHead.get());
+	//task.Bind(africanHead.get());
 
 	task1.Bind(&commonVert, &commonVarying);
 	task1.Bind(&commonFrag);
-	task1.Bind(africanHead.get());
+	task1.Bind(tri.get());
 
 	// Time
 	SR::Time::Init();

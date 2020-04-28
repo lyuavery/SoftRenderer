@@ -88,7 +88,6 @@ namespace SR
 		static const int CACHE_SIZE = 30;
 
 		// args
-		std::shared_ptr<SR::Viewport> viewport;
 		std::shared_ptr<SR::VertexShader> vert;
 		std::shared_ptr<SR::Varying> varying;
 		std::shared_ptr<const SR::Uniform> uniform;
@@ -97,7 +96,7 @@ namespace SR
 		std::queue<std::shared_ptr<VertexShaderOutput>> outputs;
 
 		State Processing(std::shared_ptr<SR::Mesh>& mesh);
-		State PostProcessing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data);
+		//State PostProcessing(std::queue<std::shared_ptr<PrimitiveAssemblyOutput>>& data);
 		virtual void Reset() override { 
 			begin = 0; 
 			decltype(outputs) tmp; outputs.swap(tmp);
@@ -120,12 +119,61 @@ namespace SR
 	class PrimitiveAssembler : public RendererComponent
 	{
 		int id;
+		static constexpr float W_CLIPPED_PLANE = 1E-5;
+		enum Axis {
+			NEGATIVE_Z = -3,
+			NEGATIVE_Y = -2,
+			NEGATIVE_X = -1,
+			W = 0,
+			POSITIVE_X = 1,
+			POSITIVE_Y = 2,
+			POSITIVE_Z = 3,
+		};
+		static std::vector<std::shared_ptr<VertexShaderOutput>> HomogeneousClipping(const std::vector<std::shared_ptr<VertexShaderOutput>>& polygon);
+		static std::vector<std::shared_ptr<VertexShaderOutput>> ClippingAgainstPlane(const std::vector<std::shared_ptr<VertexShaderOutput>>& polygon, Axis axis);
+		static float CalIntersectRatio(const Vec4& ps, const Vec4& pe, Axis axis);
+		static inline bool IsVisible(const Vec4& v)
+		{
+			return (sbm::abs(v.x) <= v.w) && (sbm::abs(v.y) <= v.w) && (sbm::abs(v.z) <= v.w);
+		}
+		static inline bool IsInside(const Vec4& v, Axis axis)
+		{
+			bool b = true;
+			switch (axis)
+			{
+			case SR::PrimitiveAssembler::W:
+				b = v.w >= W_CLIPPED_PLANE;
+				break;
+			case SR::PrimitiveAssembler::POSITIVE_X:
+				b = v.x <= v.w;
+				break;
+			case SR::PrimitiveAssembler::NEGATIVE_X:
+				b = v.x >= -v.w;
+				break;
+			case SR::PrimitiveAssembler::POSITIVE_Y:
+				b = v.y <= v.w;
+				break;
+			case SR::PrimitiveAssembler::NEGATIVE_Y:
+				b = v.y >= -v.w;
+				break;
+			case SR::PrimitiveAssembler::POSITIVE_Z:
+				b = v.z <= v.w;
+				break;
+			case SR::PrimitiveAssembler::NEGATIVE_Z:
+				b = v.z >= -v.w;
+				break;
+			default:
+				assert(0);
+				break;
+			}
+			return b;
+		}
 	public:
 		// args
 		PrimitiveAssemblyMode mode;
 		Culling cullFace;
 		FrontFace face;
-
+		std::shared_ptr<SR::Viewport> viewport;
 		std::queue<std::shared_ptr<PrimitiveAssemblyOutput>> outputs;
 
 		State Assembly(std::queue<std::shared_ptr<VertexShaderOutput>>& data);
