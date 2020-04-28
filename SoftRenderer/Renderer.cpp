@@ -100,7 +100,6 @@ std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::Cli
 
 std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::HomogeneousClipping(const std::vector<std::shared_ptr<VertexShaderOutput>>& polygon)
 {
-	return polygon;
 	bool bNeedClipped = false;
 	for (auto& v : polygon)
 	{
@@ -151,9 +150,10 @@ SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::sh
 	{
 		auto out = new PrimitiveAssemblyOutput;
 		out->vertices.reserve(3);
-		out->vertices.push_back(clippedVertices[0]);
-		out->vertices.push_back(clippedVertices[i + 1]);
-		out->vertices.push_back(clippedVertices[i + 2]);
+		for (auto& v : vertices)
+		{
+			out->vertices.push_back(std::make_shared<SR::VertexShaderOutput>(*v));
+		}
 		
 		// Perspective Division
 		for (auto& v : out->vertices)
@@ -167,13 +167,17 @@ SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::sh
 		
 		// Culling
 		float a = 0;
+		auto v0 = out->vertices[0]->gl_Position.Truncated<2>().Expanded<3>(0);
+		auto v1 = out->vertices[1]->gl_Position.Truncated<2>().Expanded<3>(0);
+		auto v2 = out->vertices[2]->gl_Position.Truncated<2>().Expanded<3>(0);
 		for (int k = 0, m = out->vertices.size(); k < m; ++k)
 		{
-			a = out->vertices[k]->gl_Position.x * out->vertices[(k+1)%m]->gl_Position.y - out->vertices[(k + 1) % m]->gl_Position.x * out->vertices[k]->gl_Position.y;
+			a += out->vertices[k]->gl_Position.x * out->vertices[(k+1)%m]->gl_Position.y - out->vertices[(k + 1) % m]->gl_Position.x * out->vertices[k]->gl_Position.y;
 		}
 		bool frontFacing = a > 0;
 		if (viewport->bTopDown) frontFacing = !frontFacing; // window屏幕坐标y轴反了，需要翻转一次
 		if (face == FrontFace::CW) frontFacing = !frontFacing;
+		
 
 		bool cull = !frontFacing;
 		if (cullFace == Culling::Front) cull = !cull;

@@ -75,15 +75,15 @@ int main()
 	// Camera
 	auto& mainCam = *SR::Camera::mainCamera;
 	mainCam.nearClip = 0.01f;
-	mainCam.farClip = 50;
+	mainCam.farClip = 7;
 	mainCam.fov = 75;
 	mainCam.viewport = SR::Viewport::main;
 	mainCam.RegisterInputListener();
 
 	gViewportMat = mainCam.ViewportTransform();
-	mainCam.position = Vec3(0,0,5);
+	mainCam.position = Vec3(2.25f,0,5);
 	gCameraPos = mainCam.position;
-	mainCam.LookAt(Vec3::zero);
+	mainCam.LookAt(Vec3(2.25f, 0, 0));
 	// Resources
 	SR::TGALoader tgaLoader;
 	std::shared_ptr<SR::Mesh> tri(SR::MeshLoader::GetInstance().Load("Resources/tri.obj"));
@@ -151,9 +151,9 @@ int main()
 	//blinnUniform.mat_ObjectToWorld = modelTRS;
 
 	SR::RenderStatus status;
-	status.depthFunc = SR::DepthFunc::Less;
+	status.depthFunc = SR::DepthFunc::Always;
 	status.bEarlyDepthTest = true;
-	status.rasterizationMode = SR::RasterizationMode::Filled;
+	status.rasterizationMode = SR::RasterizationMode::Line;
 	status.cullFace = SR::Culling::Back;
 	SR::RenderTask task;
 	task.status = status;
