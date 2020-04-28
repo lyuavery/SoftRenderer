@@ -91,12 +91,12 @@ int main()
 	std::shared_ptr<SR::Mesh> sphere(SR::MeshLoader::GetInstance().Load("Resources/sphere.obj", true));
 	std::shared_ptr<SR::Mesh> floor(SR::MeshLoader::GetInstance().Load("Resources/floor/floor.obj", true));
 	std::shared_ptr<SR::Texture> floorDiffuse(tgaLoader.Load("Resources/floor/floor_diffuse.tga"));// 
-	//
-	//std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj", true));
-	//std::shared_ptr<SR::Texture> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
-	//std::shared_ptr<SR::Texture> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
-	//std::shared_ptr<SR::Texture> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
-	//
+	
+	std::shared_ptr<SR::Mesh> africanHead(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head.obj", true));
+	std::shared_ptr<SR::Texture> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
+	std::shared_ptr<SR::Texture> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
+	std::shared_ptr<SR::Texture> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	
 	//std::shared_ptr<SR::Mesh> bianka_s(SR::MeshLoader::GetInstance().Load("Resources/bianka_s.obj", true));
 	
 	//std::shared_ptr<SR::Mesh> africanHeadEyeInner(SR::MeshLoader::GetInstance().Load("Resources/african_head/african_head_eye_inner.obj", true));
@@ -151,7 +151,7 @@ int main()
 	//blinnUniform.mat_ObjectToWorld = modelTRS;
 
 	SR::RenderStatus status;
-	status.depthFunc = SR::DepthFunc::Always;
+	status.depthFunc = SR::DepthFunc::Less;
 	status.bEarlyDepthTest = true;
 	status.rasterizationMode = SR::RasterizationMode::Line;
 	status.cullFace = SR::Culling::Back;
@@ -171,7 +171,7 @@ int main()
 
 	task1.Bind(&commonVert, &commonVarying);
 	task1.Bind(&commonFrag);
-	task1.Bind(tri.get());
+	task1.Bind(africanHead.get());
 
 	// Time
 	SR::Time::Init();

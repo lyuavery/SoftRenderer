@@ -77,7 +77,7 @@ std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::Cli
 			float t = CalIntersectRatio(ps.gl_Position, pe.gl_Position, axis);
 
 			SR::VertexShaderOutput p;
-			p.gl_VertexID = insidet ? ps.gl_VertexID : pe.gl_VertexID;
+			//p.gl_VertexID = insidet ? ps.gl_VertexID : pe.gl_VertexID;
 			p.gl_Position = ps.gl_Position + (pe.gl_Position - ps.gl_Position) * t;
 			int size = bool(ps.varying) ? ps.varying->size() : 0;
 			int i = 0;
@@ -110,7 +110,7 @@ std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::Hom
 	if (!bNeedClipped) return polygon;
 	int i = 0;
 	std::vector<std::shared_ptr<VertexShaderOutput>> pingpong[2] = { polygon };
-	const Axis plane[] = { W,POSITIVE_X,NEGATIVE_X,POSITIVE_Y,NEGATIVE_Y,POSITIVE_Z,NEGATIVE_Z }; // w,x,-x,y,-y,z,-z
+	const Axis plane[] = { W,POSITIVE_Z,NEGATIVE_Z }; // w,x,-x,y,-y,z,-z //POSITIVE_X,NEGATIVE_X,POSITIVE_Y,NEGATIVE_Y,
 	for (auto k : plane)
 	{
 		pingpong[(i + 1) % 2] = std::move(ClippingAgainstPlane(pingpong[i], k));
@@ -150,10 +150,9 @@ SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::sh
 	{
 		auto out = new PrimitiveAssemblyOutput;
 		out->vertices.reserve(3);
-		for (auto& v : vertices)
-		{
-			out->vertices.push_back(std::make_shared<SR::VertexShaderOutput>(*v));
-		}
+		out->vertices.push_back(std::make_shared<SR::VertexShaderOutput>(*clippedVertices[0]));
+		out->vertices.push_back(std::make_shared<SR::VertexShaderOutput>(*clippedVertices[i + 1]));
+		out->vertices.push_back(std::make_shared<SR::VertexShaderOutput>(*clippedVertices[i + 2]));
 		
 		// Perspective Division
 		for (auto& v : out->vertices)
@@ -246,7 +245,7 @@ void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& 
 	{
 		for (int j = bboxMin.x; j <= bboxMax.x; ++j)
 		{
-			Vec2 p(j + 0.5f, i + 0.5f);
+			Vec2 p(j, i);
 			Vec3 lambda3 = barycentric(p0, p1, p2, p);
 			bool overlap = true;
 			for (int i = 0; i < 3; ++i)
@@ -288,11 +287,11 @@ void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& 
 			if (hasCustomedVarying)
 			{
 				out->varying.reset(v0.varying->Clone());
-				int i = 0;
-				while (i < size)
+				int num = 0;
+				while (num < size)
 				{
-					(*out->varying)[i] = lambda3.x * (*v0.varying)[i] + lambda3.y * (*v1.varying)[i] + lambda3.z * (*v2.varying)[i],
-					++i;
+					(*out->varying)[num] = lambda3.x * (*v0.varying)[num] + lambda3.y * (*v1.varying)[num] + lambda3.z * (*v2.varying)[num],
+					++num;
 				}
 			}
 
