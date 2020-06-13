@@ -31,7 +31,7 @@ namespace SR
 			VertexShaderOutput out;
 			auto varying = std::dynamic_pointer_cast<CommonVarying>(v);
 			auto uniform = std::dynamic_pointer_cast<const CommonUniform>(u);
-			if(uniform) out.gl_Position = uniform->mat_ObjectToClip * in.position.Expanded<4>(1);
+			if(uniform) out.gl_Position = uniform->mat_ObjectToClip * in.position.Expanded<4>(0);
 			if (varying)
 			{
 				varying->uv = Vec2(in.uv.x, 1 - in.uv.y);

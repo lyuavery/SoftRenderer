@@ -100,6 +100,7 @@ std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::Cli
 
 std::vector<std::shared_ptr<SR::VertexShaderOutput>> SR::PrimitiveAssembler::HomogeneousClipping(const std::vector<std::shared_ptr<VertexShaderOutput>>& polygon)
 {
+	return polygon;
 	bool bNeedClipped = false;
 	for (auto& v : polygon)
 	{
@@ -142,9 +143,8 @@ SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::sh
 	}
 	size -= vnum;
 
-	// TODO: Clipping
+	// Clipping
 	auto clippedVertices = HomogeneousClipping(vertices);
-
 	// Assembly
 	for (int i = 0, n = clippedVertices.size(); i < n - 2; ++i)
 	{
@@ -161,6 +161,7 @@ SR::RendererComponent::State SR::PrimitiveAssembler::Assembly(std::queue<std::sh
 			v->gl_Position.x *= v->gl_Position.w;
 			v->gl_Position.y *= v->gl_Position.w;
 			v->gl_Position.z *= v->gl_Position.w;
+			// Viewport Transform
 			viewport->ApplyViewportTransform(v->gl_Position);
 		}
 		
@@ -241,16 +242,18 @@ void SR::Rasterizer::RasterizeFilledTriangle(const SR::PrimitiveAssemblyOutput& 
 	bool hasCustomedVarying = bool(v0.varying);
 	assert(hasCustomedVarying ? (v0.varying->size() == v1.varying->size()) && (v0.varying->size() == v2.varying->size()) : true);
 	int size = hasCustomedVarying ? v0.varying->size() : 0;
-	for (int i = bboxMin.y; i <= bboxMax.y; ++i)
+	for (int i = bboxMin.y - 1; i <= bboxMax.y; ++i)
 	{
-		for (int j = bboxMin.x; j <= bboxMax.x; ++j)
+		for (int j = bboxMin.x-1; j <= bboxMax.x; ++j)
 		{
-			Vec2 p(j, i);
+			Vec2 p(j+0.5f, i + 0.5f);
+			//Vec3d lambda3 = barycentric(Vec2d(p0.x, p0.y), Vec2d(p1.x, p1.y), Vec2d(p2.x, p2.y), p);
 			Vec3 lambda3 = barycentric(p0, p1, p2, p);
 			bool overlap = true;
 			for (int i = 0; i < 3; ++i)
 			{
 				// Top-Left Rule
+				//overlap &= (lambda3[i] >= 0);
 				overlap &= (lambda3[i] == 0) ? ((edge[i].x < 0 && edge[i].y == 0) || edge[i].y < 0) : (lambda3[i] > 0);
 			}
 			if (!overlap) continue;

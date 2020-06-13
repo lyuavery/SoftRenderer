@@ -129,7 +129,7 @@ namespace sbm
 		// (u, v, 1) 与（AB.x, AC.x, PA.x) 和（AB.y, AC.y, PA.y) 正交，
 		sbm::Vec<T, 3> lambda = Cross(sbm::Vec<T, 3>(v1.x - v0.x, v2.x - v0.x, v0.x - p.x), sbm::Vec<T, 3>(v1.y - v0.y, v2.y - v0.y, v0.y - p.y));
 		// 由于使用整数坐标，lambda.z为两倍三角形面积，等于0时证明退化
-		if (sbm::abs(lambda.z) < 1e-4) return sbm::Vec<T, 3>(-1, 1, 1);
+		if (sbm::abs(lambda.z) < 1e-10) return sbm::Vec<T, 3>(-1, 1, 1);
 		float rcpArea = 1.0f / lambda.z;
 		// 除以lambda.z来规范重心坐标和为1
 		return sbm::Vec<T, 3>(1.f - (lambda.x + lambda.y) * rcpArea, lambda.x * rcpArea, lambda.y * rcpArea);
