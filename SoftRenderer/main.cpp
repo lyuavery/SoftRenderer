@@ -43,6 +43,12 @@ int main()
 	std::shared_ptr<SR::Texture> africanHeadDiffuse(tgaLoader.Load("Resources/african_head/african_head_diffuse.tga"));// 
 	std::shared_ptr<SR::Texture> africanHeadNormal(tgaLoader.Load("Resources/african_head/african_head_nm_tangent.tga"));// 
 	std::shared_ptr<SR::Texture> africanHeadSpec(tgaLoader.Load("Resources/african_head/african_head_spec.tga"));// 
+	if (!africanHead || !africanHeadDiffuse || !africanHeadNormal || !africanHeadSpec)
+	{
+		XLogError("Fail to load resources!");
+		system("pause");
+		return 0;
+	}
 
 	// Window
 	auto& wnd = SR::Window::GetInstance();
