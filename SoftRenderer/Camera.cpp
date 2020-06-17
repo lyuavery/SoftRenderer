@@ -147,50 +147,40 @@ void SR::Camera::OnKeyBoardMsg()
 		position = Vec3(0, 0, 3);
 		LookAt(center);
 	}
-	if (SR::Input::GetKeyDown(SR::KeyCode::LeftCtrl) || SR::Input::GetKeyDown(SR::KeyCode::RightCtrl))
-	{
-		mode |= int(Mode::Rotate);
-	}
-	else if(SR::Input::GetKeyUp(SR::KeyCode::LeftCtrl) || SR::Input::GetKeyUp(SR::KeyCode::RightCtrl))
-	{
-		mode &= ~int(Mode::Rotate);
-
-	}
+	
 }
 
 void SR::Camera::OnMouseBottonMsg(SR::KeyCode code, bool bClicked, float posX, float posY)
 {
+	int cur = 0;
 	switch (code)
 	{
 	case SR::KeyCode::LeftMouse:
 	{
-		if (bClicked) {
-			if (!(mode & int(Mode::Pan)))
-			{
-				mode |= int(Mode::Orbit);
-			}
-		}
-		else {
-			mode &= ~int(Mode::Orbit);
-		}
+		cur = int(Mode::Orbit);
 		break;
 	}
 	case SR::KeyCode::RightMouse:
 	{
-		if (bClicked) {
-			if (!(mode & int(Mode::Orbit)))
-			{
-				mode |= int(Mode::Pan);
-			}
-		}
-		else {
-			mode &= ~int(Mode::Pan);
-		}
-
+		cur = int(Mode::Rotate);
 		break;
+	}
+	case SR::KeyCode::MiddleMouse:
+	{
+		cur = int(Mode::Pan);
 	}
 	default:
 		break;
+	}
+
+	if (bClicked) {
+		if ((mode & ~cur) == 0) {
+			mode |= cur;
+		}
+	}
+	else
+	{
+		mode &= ~cur;
 	}
 }
 
@@ -198,21 +188,19 @@ void SR::Camera::OnMouseMove(float posX, float posY)
 {
 	auto&& pos = SR::Input::GetLastCursorPos();
 	float xOffset = posX - pos.x, yOffset = posY - pos.y;
+
 	if (mode & int(Mode::Orbit))
 	{
-		if (mode & int(Mode::Rotate))
-		{
-			Rotate(-xOffset * mouseRotateSensitivity, -yOffset * mouseRotateSensitivity);
-		}
-		else
-		{
-			// +y offset -theta, +x offset - phi
-			Orbit(-xOffset * angularSpeed, -yOffset * angularSpeed);
-		}
+		// +y offset -theta, +x offset - phi
+		Orbit(-xOffset * angularSpeed, -yOffset * angularSpeed);
 	}
 	else if (mode & int(Mode::Pan))
 	{
 		Pan(xOffset * mouseDragSensitivity, yOffset * mouseDragSensitivity);
+	}
+	else if (mode & int(Mode::Rotate))
+	{
+		Rotate(-xOffset * mouseRotateSensitivity, -yOffset * mouseRotateSensitivity);
 	}
 }
 
@@ -264,10 +252,16 @@ void SR::Camera::Orbit(float deltaPhi, float deltaTheta, bool constrain)
 
 void SR::Camera::Rotate(float deltaYaw, float deltaPitch, bool constrain)
 {	
-	Mat4 rotation = Mat4::Rotate(Vec3(deltaPitch, deltaYaw, 0));
-	auto distance = (center - position).Magnitude();
-	front = (rotation * front.Expanded<4>(0)).Truncated<3>();
-	if (constrain)
+	Mat4 rotation = Mat4::AxisAngle(up, -deltaYaw);
+	front = Mat3(rotation) * front;
+	right = sbm::Cross(up, front).Normalized();
+	rotation = Mat4::AxisAngle(right, -deltaPitch);
+	front = (Mat3(rotation) * front).Normalized();
+	up = sbm::Cross(front, right);
+
+	/*auto distance = (center - position).Magnitude();
+	front = (rotation * front.Expanded<4>(0)).Truncated<3>();*/
+	/*if (constrain)
 	{
 		front.Normalize();
 		if (sbm::abs(front.y) > 0.99f)
@@ -275,9 +269,7 @@ void SR::Camera::Rotate(float deltaYaw, float deltaPitch, bool constrain)
 			front.y = 0.99f * (front.y > 0 ? 1 : -1);
 			front.Normalize();
 		}
-	}
-	center = position + distance * -front;
-	UpdateCameraBasis();
+	}*/
 }
 
 void SR::Camera::Zoom(float yoffset)

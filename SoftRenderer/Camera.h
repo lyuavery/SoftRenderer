@@ -55,7 +55,7 @@ namespace SR
 		float angularSpeed = 0.5f;
 		float zoomSpeed = 10;
 		float mouseDragSensitivity = .03f;
-		float mouseRotateSensitivity = .06f;
+		float mouseRotateSensitivity = .08f;
 	
 		void Dolly(const Vec3& deltaTranslation);
 		void Pan(float deltaX, float deltaY);

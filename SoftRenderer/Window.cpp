@@ -87,8 +87,6 @@ LRESULT __stdcall SR::Window::MessageLoop(HWND hWnd, UINT msg, WPARAM wParam, LP
 		}
 		break;
 	}
-	case WM_MBUTTONDOWN: { break; }
-	case WM_MBUTTONUP: { break; }
 	case WM_LBUTTONDOWN: {
 		float x, y;
 		wnd.GetCursorPos(x, y);
@@ -112,6 +110,18 @@ LRESULT __stdcall SR::Window::MessageLoop(HWND hWnd, UINT msg, WPARAM wParam, LP
 		wnd.GetCursorPos(x, y);
 		Input::SetCursorPos(x, y);
 		Input::NotifyMouseButtonListeners(SR::KeyCode::RightMouse, false, x, y); break;
+	}
+	case WM_MBUTTONDOWN: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		Input::NotifyMouseButtonListeners(SR::KeyCode::MiddleMouse, true, x, y); break;
+	}
+	case WM_MBUTTONUP: {
+		float x, y;
+		wnd.GetCursorPos(x, y);
+		Input::SetCursorPos(x, y);
+		Input::NotifyMouseButtonListeners(SR::KeyCode::MiddleMouse, false, x, y); break;
 	}
 	case WM_MOUSEWHEEL: {
 		float offset = GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA;

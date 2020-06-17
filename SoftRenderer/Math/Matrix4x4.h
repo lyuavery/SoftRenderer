@@ -73,6 +73,7 @@ namespace sbm
 		static Matrix<4, 4, T> TRS(const Vec<T, 3>& translation, const Vec<T, 3>& rotation, const Vec<T, 3>& scale);
 		static Matrix<4, 4, T> Translate(const Vec<T, 3>& translation);
 		static Matrix<4, 4, T> Rotate(const Vec<T, 3>& rotation);
+		static Matrix<4, 4, T> AxisAngle(const Vec<T, 3>& axis, const float theta);
 		static Matrix<4, 4, T> Scale(const Vec<T, 3>& scale);
 		static Matrix<4, 4, T> LookAt(const Vec<T, 3>& eye, const Vec<T, 3>& position, const Vec<T, 3>& up);
 
@@ -200,7 +201,7 @@ namespace sbm
 		_M(3, 0) *= scale; _M(3, 1) *= scale; _M(3, 2) *= scale; _M(3, 3) *= scale;
 		return *this;
 	}
-
+	
 #define SWAP_ROWS(a, b) { float *_tmp = a; (a)=(b); (b)=_tmp; }
 #define RETURN_ZERO(m) \
 { \
@@ -396,6 +397,20 @@ namespace sbm
 		MAT(mat, 0, 0) = cosz * cosy + sinx * siny * sinz; MAT(mat, 0, 1) = -sinz * cosy + sinx * siny * cosz; MAT(mat, 0, 2) = cosx * siny;
 		MAT(mat, 1, 0) = cosx * sinz; MAT(mat, 1, 1) = cosx * cosz; MAT(mat, 1, 2) = -sinx;
 		MAT(mat, 2, 0) = -cosz * siny + sinx * cosy * sinz; MAT(mat, 2, 1) = sinz * siny + sinx * cosy * cosz; MAT(mat, 2, 2) = cosx * cosy;
+		return mat;
+	}
+
+	template<typename T>
+	Matrix<4, 4, T> Matrix<4, 4, T>::AxisAngle(const Vec<T, 3>& axis, const float theta)
+	{
+		float rad = sbm::radians(theta);
+		const float cost = sbm::cos(rad);
+		const float sint = sbm::sin(rad);
+		const Vec<T, 3>& n = axis;
+		auto mat = Matrix<4, 4, T>::Identity;
+		MAT(mat, 0, 0) = n.x*n.x*(1-cost)+cost ; MAT(mat, 0, 1) = n.x*n.y*(1 - cost) + n.z*sint; MAT(mat, 0, 2) = n.x*n.z*(1 - cost) - n.y*sint;
+		MAT(mat, 1, 0) = n.y*n.x*(1 - cost) - n.z*sint; MAT(mat, 1, 1) = n.y*n.y*(1 - cost) + cost; MAT(mat, 1, 2) = n.y*n.z*(1 - cost) + n.x*sint;
+		MAT(mat, 2, 0) = n.z*n.x*(1 - cost) + n.y*sint; MAT(mat, 2, 1) = n.z*n.y*(1 - cost) - n.x*sint; MAT(mat, 2, 2) = n.z*n.z*(1 - cost) + cost;
 		return mat;
 	}
 
